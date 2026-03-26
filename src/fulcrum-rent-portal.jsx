@@ -152,13 +152,40 @@ const CSS = `
   .install-banner { position:fixed; bottom:20px; right:20px; background:var(--primary); color:#fff; padding:14px 18px; border-radius:var(--r); box-shadow:var(--shadow-3); display:flex; align-items:center; gap:14px; z-index:200; border-left:3px solid rgba(255,255,255,.3); max-width:340px; }
   .install-text { font-size:13px; line-height:1.5; }
   .install-text strong { display:block; margin-bottom:2px; }
+  .mobile-header { display:none; }
+  .bottom-nav { display:none; }
   @media(max-width:900px){
     .sidebar { width:64px; }
     .nav-item span,.nav-section,.user-chip,.user-name,.btn-signout { display:none; }
     .main { margin-left:64px; padding:28px 16px; }
-    .stats { grid-template-columns:1fr 1fr; }
+    .stats { grid-template-columns:repeat(3,1fr); }
     .auth-deco { display:none; }
     .auth-panel { width:100%; }
+    .type-toggle { grid-template-columns:1fr; }
+    .range-row { grid-template-columns:1fr; }
+  }
+  @media(max-width:600px){
+    .sidebar { display:none; }
+    .mobile-header { display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:var(--primary); position:fixed; top:0; left:0; right:0; z-index:50; height:52px; border-bottom:1px solid rgba(255,255,255,.1); }
+    .mobile-header-user { display:flex; align-items:center; gap:10px; }
+    .mobile-signout { background:transparent; border:1px solid rgba(255,255,255,.3); color:rgba(255,255,255,.8); font-size:12px; padding:5px 10px; border-radius:var(--r); cursor:pointer; font-family:'Inter',sans-serif; }
+    .main { margin-left:0; padding:68px 14px 76px; min-height:100vh; }
+    .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--primary); border-top:1px solid rgba(255,255,255,.1); z-index:50; }
+    .bottom-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:7px 2px 8px; color:rgba(255,255,255,.55); cursor:pointer; position:relative; gap:2px; }
+    .bottom-nav-item.active { color:#fff; background:rgba(255,255,255,.08); }
+    .bottom-nav-icon { font-size:20px; line-height:1; }
+    .bottom-nav-label { font-size:9px; letter-spacing:.3px; text-transform:uppercase; font-weight:500; }
+    .bottom-nav-badge { position:absolute; top:5px; left:calc(50% + 6px); background:#b04040; color:#fff; border-radius:10px; padding:1px 5px; font-size:9px; font-weight:700; line-height:1.4; }
+    .stats { grid-template-columns:1fr 1fr; }
+    .page-title { font-size:20px; }
+    .page-header { margin-bottom:18px; }
+    .card { padding:14px 14px; overflow-x:auto; }
+    .tbl { min-width:480px; }
+    .modal { padding:20px 16px; max-height:88vh; width:100%; }
+    .row-between { flex-wrap:wrap; gap:8px; }
+    .row { flex-wrap:wrap; }
+    .auth-panel { padding:36px 24px; }
+    .install-banner { bottom:76px; right:12px; left:12px; max-width:100%; }
     .type-toggle { grid-template-columns:1fr; }
     .range-row { grid-template-columns:1fr; }
   }
@@ -420,8 +447,17 @@ function AppShell({ session, page, setPage, onLogout, users, requests, onApprove
   ];
   const nav = isStaff ? adminNav : brokerNav;
 
+  const navItems = nav.filter(n => !n.section);
+
   return (
     <div className="shell">
+      <div className="mobile-header">
+        <img src="/No BG, Light Text.png" style={{height:30}} alt="Fulcrum Australia" />
+        <div className="mobile-header-user">
+          <span style={{fontSize:13,color:"rgba(255,255,255,.8)"}}>{session.name}</span>
+          <button className="mobile-signout" onClick={onLogout}>Sign Out</button>
+        </div>
+      </div>
       <aside className="sidebar">
         <div className="sidebar-logo"><img src="/No BG, Light Text.png" style={{maxWidth:140,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
         <nav className="nav">
@@ -456,6 +492,15 @@ function AppShell({ session, page, setPage, onLogout, users, requests, onApprove
           {page==="requests"  && <BrokerRequests requests={requests.filter(r=>r.brokerId===session.id)} />}
         </>}
       </main>
+      <nav className="bottom-nav">
+        {navItems.map(n => (
+          <div key={n.id} className={`bottom-nav-item${page===n.id?" active":""}`} onClick={()=>setPage(n.id)}>
+            {n.badge>0 && <span className="bottom-nav-badge">{n.badge}</span>}
+            <span className="bottom-nav-icon">{n.icon}</span>
+            <span className="bottom-nav-label">{n.label}</span>
+          </div>
+        ))}
+      </nav>
     </div>
   );
 }
