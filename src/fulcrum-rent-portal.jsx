@@ -91,6 +91,7 @@ const CSS = `
   .badge-rent     { background:#edf0f5; color:var(--primary); }
   .badge-cma      { background:#e4eef0; color:#1a5a65; }
   .badge-pdr      { background:#eaecf5; color:#3a4a80; }
+  .badge-referral { background:#fef3e2; color:#7a4a00; }
   .btn-purple   { background:var(--indigo); color:#fff; border-color:var(--indigo); }
   .btn-purple:hover { background:#3a4a7a; border-color:#3a4a7a; }
   .pill-group { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }
@@ -314,11 +315,14 @@ export default function App() {
   const submitRequest = async data => {
     const req = { ...data, id: uid(), brokerId: session.id, brokerName: session.name, brokerEmail: session.email, brokerCompany: session.company, status: "pending", createdAt: Date.now(), completedAt: null, downloadUrl: null };
     await saveRequests([req, ...requests]);
-    const typeLabel = data.type === "rent" ? "Rent Letter" : data.type === "cma" ? "CMA" : "PDR";
+    const typeLabel = data.type === "rent" ? "Rent Letter" : data.type === "cma" ? "CMA" : data.type === "referral" ? "Client Referral" : "PDR";
+    const message = data.type === "referral"
+      ? `A new client referral has been submitted.\n\nReferring Broker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\n\nClient Name: ${data.clientName}\nClient Email: ${data.clientEmail}\nClient Mobile: ${data.clientMobile || "—"}\n\nSituation:\n${data.situation}\n\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review this referral.`
+      : `A new ${typeLabel} request has been submitted.\n\nBroker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\nAddress: ${data.address || "—"}\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review and complete this request.`;
     sendEmail(EMAILJS_TEMPLATE_STAFF, {
       email: "brian@fulcrumaustralia.com.au",
-      subject: `New ${typeLabel} Request — ${session.name} (${session.company})`,
-      message: `A new ${typeLabel} request has been submitted.\n\nBroker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\nAddress: ${data.address || "—"}\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review and complete this request.`
+      subject: `New ${typeLabel} — ${session.name} (${session.company})`,
+      message
     });
     return req;
   };
@@ -443,6 +447,8 @@ function AppShell({ session, page, setPage, onLogout, users, requests, onApprove
     { id:"cma-requests",  icon:"🏡", label:"CMA Requests",  badge:pendingCMA  },
     { section:"Price Discovery" },
     { id:"pdr-requests",  icon:"🔍", label:"PDR Reports",    badge:pendingPDR },
+    { section:"Referrals" },
+    { id:"referrals",     icon:"🤝", label:"Referrals",     badge:requests.filter(r=>r.type==="referral"&&r.status==="pending").length },
     { section:"Admin" },
     { id:"brokers",       icon:"👥", label:"Brokers",       badge:pendingApprovals },
   ];
@@ -490,6 +496,7 @@ function AppShell({ session, page, setPage, onLogout, users, requests, onApprove
           {page==="rent-requests" && <AdminRequests  requests={requests.filter(r=>r.type==="rent")} onUpdate={onUpdateRequest} type="rent" />}
           {page==="cma-requests"  && <AdminRequests  requests={requests.filter(r=>r.type==="cma")}  onUpdate={onUpdateRequest} type="cma"  />}
           {page==="pdr-requests"  && <AdminPDRRequests requests={requests.filter(r=>r.type==="pdr")} onUpdate={onUpdateRequest} />}
+          {page==="referrals"     && <AdminReferrals  requests={requests.filter(r=>r.type==="referral")} onUpdate={onUpdateRequest} />}
           {page==="brokers"       && <AdminBrokers   users={users} onApprove={onApprove} onReject={onReject} />}
         </>}
         {isBroker && <>
@@ -526,6 +533,7 @@ function AdminDashboard({ requests, users, setPage }) {
         <div className="stat"><div className="stat-num teal">{cmaPending.length}</div><div className="stat-label">CMA Pending</div></div>
         <div className="stat"><div className="stat-num green">{complete.length}</div><div className="stat-label">Completed</div></div>
         <div className="stat"><div className="stat-num" style={{color:"var(--indigo)"}}>{requests.filter(r=>r.type==="pdr"&&r.status==="pending").length}</div><div className="stat-label">PDR Pending</div></div>
+        <div className="stat"><div className="stat-num" style={{color:"#7a4a00"}}>{requests.filter(r=>r.type==="referral"&&r.status==="pending").length}</div><div className="stat-label">Referrals</div></div>
       </div>
       {awaitApproval.length>0 && (
         <div className="card" style={{marginBottom:16,borderLeft:"3px solid var(--danger)"}}>
@@ -704,24 +712,107 @@ function AdminBrokers({ users, onApprove, onReject }) {
   );
 }
 
+// ── Admin Referrals ───────────────────────────────────────────────────────────
+function AdminReferrals({ requests, onUpdate }) {
+  const [selected, setSelected] = useState(null);
+  const [filter,   setFilter]   = useState("all");
+  const [notes,    setNotes]    = useState("");
+  const [done,     setDone]     = useState(false);
+  const filtered = filter==="all" ? requests : requests.filter(r=>r.status===filter);
+  const markComplete = async req => {
+    await onUpdate(req.id, { status:"complete", completedAt:Date.now(), staffNotes:notes });
+    setDone(true);
+    setTimeout(()=>{ setSelected(null); setNotes(""); setDone(false); }, 2000);
+  };
+  return (
+    <>
+      <div className="page-header">
+        <div className="page-title">Client Referrals</div>
+        <div className="page-sub">Referrals submitted by brokers and financial planners</div>
+      </div>
+      <div className="card">
+        <div className="row" style={{marginBottom:20,gap:8}}>
+          {["all","pending","complete"].map(f=>(
+            <button key={f} className={`btn ${filter===f?"btn-primary":"btn-secondary"} btn-sm`}
+              onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>{f}</button>
+          ))}
+        </div>
+        <table className="tbl">
+          <thead><tr><th>Client</th><th>Referred By</th><th>Company</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {filtered.map(r=>(
+              <tr key={r.id}>
+                <td><strong>{r.clientName}</strong><br/><span style={{fontSize:12,color:"#aaa"}}>{r.clientEmail}</span></td>
+                <td>{r.brokerName}</td>
+                <td style={{fontSize:13,color:"#888"}}>{r.brokerCompany}</td>
+                <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
+                <td><StatusBadge s={r.status} /></td>
+                <td><button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setNotes(r.staffNotes||""); }}>Review</button></td>
+              </tr>
+            ))}
+            {filtered.length===0 && <tr><td colSpan={6}><div className="empty"><div className="empty-icon">🤝</div>No referrals found</div></td></tr>}
+          </tbody>
+        </table>
+      </div>
+      {selected && (
+        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSelected(null)}>
+          <div className="modal">
+            <div className="modal-title">Client Referral Details</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 24px",marginBottom:20}}>
+              <Detail label="Client Name"  val={selected.clientName} />
+              <Detail label="Client Email" val={selected.clientEmail} />
+              <Detail label="Client Mobile" val={selected.clientMobile||"—"} />
+              <Detail label="Submitted"    val={fmt(selected.createdAt)} />
+              <Detail label="Referring Broker"   val={selected.brokerName} />
+              <Detail label="Broker Company"     val={selected.brokerCompany} />
+              <Detail label="Broker Email"       val={selected.brokerEmail} />
+              <Detail label="Client Situation" val={selected.situation} full />
+            </div>
+            <div className="divider" />
+            {done
+              ? <div className="alert alert-success">✅ Referral marked as complete.</div>
+              : <>
+                  <div className="field">
+                    <label>Staff Notes <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+                    <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Internal notes about this referral…" style={{resize:"vertical"}} />
+                  </div>
+                  <div className="row" style={{justifyContent:"flex-end",gap:10}}>
+                    <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
+                    {selected.status==="pending" && (
+                      <button className="btn btn-primary" onClick={()=>markComplete(selected)}>✅ Mark Complete</button>
+                    )}
+                    {selected.status==="complete" && (
+                      <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Notes</button>
+                    )}
+                  </div>
+                </>
+            }
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Broker Dashboard ──────────────────────────────────────────────────────────
 function BrokerDashboard({ session, requests, setPage }) {
-  const complete = requests.filter(r=>r.status==="complete");
-  const rentReqs = requests.filter(r=>r.type==="rent");
-  const cmaReqs  = requests.filter(r=>r.type==="cma");
-  const recent   = requests.slice(0,4);
+  const complete     = requests.filter(r=>r.status==="complete");
+  const rentReqs     = requests.filter(r=>r.type==="rent");
+  const cmaReqs      = requests.filter(r=>r.type==="cma");
+  const referralReqs = requests.filter(r=>r.type==="referral");
+  const recent       = requests.slice(0,4);
   return (
     <>
       <div className="page-header">
         <div className="page-title">Welcome, {session.name.split(" ")[0]}</div>
         <div className="page-sub">{session.company} · Property Services Portal</div>
       </div>
-      <div className="stats" style={{gridTemplateColumns:"repeat(4,1fr)"}}>
-        <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total Requests</div></div>
+      <div className="stats" style={{gridTemplateColumns:"repeat(5,1fr)"}}>
+        <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total</div></div>
         <div className="stat"><div className="stat-num gold">{rentReqs.length}</div><div className="stat-label">Rent Letters</div></div>
         <div className="stat"><div className="stat-num teal">{cmaReqs.length}</div><div className="stat-label">CMAs</div></div>
         <div className="stat"><div className="stat-num green">{complete.length}</div><div className="stat-label">Completed</div></div>
-        <div className="stat"><div className="stat-num" style={{color:"var(--indigo)"}}>{requests.filter(r=>r.type==="pdr"&&r.status==="pending").length}</div><div className="stat-label">PDR Pending</div></div>
+        <div className="stat"><div className="stat-num" style={{color:"#7a4a00"}}>{referralReqs.length}</div><div className="stat-label">Referrals</div></div>
       </div>
       <div className="row" style={{marginBottom:20,gap:12}}>
         <button className="btn btn-primary" onClick={()=>setPage("new")}>✏️ New Request</button>
@@ -770,8 +861,10 @@ function NewRequest({ onSubmit, onDone }) {
         <div style={{fontSize:56,marginBottom:16}}>✅</div>
         <h2 style={{fontFamily:"'Inter',sans-serif",fontSize:20,fontWeight:700,color:"var(--primary)",marginBottom:12}}>Request Received</h2>
         <p style={{color:"#888",lineHeight:1.7,marginBottom:24}}>
-          Your {lastType==="rent"?"rent letter":lastType==="cma"?"comparative market analysis":"Price Discovery Report"} request has been received.<br/>
-          You'll be notified as soon as your document is ready to download.
+          {lastType==="referral"
+            ? "Your client referral has been received. The Fulcrum Australia team will be in touch with your client shortly."
+            : <>Your {lastType==="rent"?"rent letter":lastType==="cma"?"comparative market analysis":"Price Discovery Report"} request has been received.<br/>You'll be notified as soon as your document is ready to download.</>
+          }
         </p>
         <div className="row" style={{justifyContent:"center",gap:12}}>
           <button className="btn btn-primary" onClick={onDone}>View My Requests</button>
@@ -798,17 +891,23 @@ function NewRequest({ onSubmit, onDone }) {
               <div className="type-card-title">Market Analysis</div>
               <div className="type-card-desc">Comparative market analysis showing estimated current property value.</div>
             </div>
-            <div className={`type-card${type==="pdr"?" sel-purple":""}`} onClick={()=>setType("pdr")} style={{gridColumn:"1/-1"}}>
+            <div className={`type-card${type==="pdr"?" sel-purple":""}`} onClick={()=>setType("pdr")}>
               <div className="type-card-icon">🔍</div>
               <div className="type-card-title">Price Discovery Report</div>
               <div className="type-card-desc">Send a detailed questionnaire to your client to understand their purchasing parameters — budget, property type, location and investment goals. You'll receive a report confirming what's achievable.</div>
             </div>
+            <div className={`type-card${type==="referral"?" sel-gold":""}`} onClick={()=>setType("referral")} style={{gridColumn:"1/-1",borderColor:type==="referral"?"#7a4a00":"",background:type==="referral"?"#fef3e2":""}}>
+              <div className="type-card-icon">🤝</div>
+              <div className="type-card-title">Client Referral</div>
+              <div className="type-card-desc">Refer a client to Fulcrum Australia for professional property buying services. Our buyers agency team will follow up directly with your client.</div>
+            </div>
           </div>
         </div>
       )}
-      {type==="rent" && <RentForm onSubmit={handleSubmit} onBack={()=>setType(null)} />}
-      {type==="cma"  && <CMAForm  onSubmit={handleSubmit} onBack={()=>setType(null)} />}
-      {type==="pdr"  && <PDRBrokerForm onSubmit={handleSubmit} onBack={()=>setType(null)} session={null} />}
+      {type==="rent"     && <RentForm     onSubmit={handleSubmit} onBack={()=>setType(null)} />}
+      {type==="cma"      && <CMAForm      onSubmit={handleSubmit} onBack={()=>setType(null)} />}
+      {type==="pdr"      && <PDRBrokerForm onSubmit={handleSubmit} onBack={()=>setType(null)} session={null} />}
+      {type==="referral" && <ReferralForm  onSubmit={handleSubmit} onBack={()=>setType(null)} />}
     </div>
   );
 }
@@ -896,6 +995,49 @@ function CMAForm({ onSubmit, onBack }) {
   );
 }
 
+function ReferralForm({ onSubmit, onBack }) {
+  const [form, setForm] = useState({ clientName:"", clientEmail:"", clientMobile:"", situation:"" });
+  const [err,  setErr]  = useState("");
+  const [loading, setLoading] = useState(false);
+  const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+  const submit = async () => {
+    if (!form.clientName.trim())  return setErr("Client name is required.");
+    if (!form.clientEmail.trim()) return setErr("Client email is required.");
+    if (!/\S+@\S+\.\S+/.test(form.clientEmail)) return setErr("Please enter a valid email address.");
+    if (!form.situation.trim())   return setErr("Please provide a brief description of the client and their situation.");
+    setLoading(true); await onSubmit(form); setLoading(false);
+  };
+  return (
+    <div className="card" style={{marginTop:16}}>
+      <div className="row-between" style={{marginBottom:16}}>
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🤝 Client Referral</div>
+        <button className="btn btn-secondary btn-sm" onClick={onBack}>← Change type</button>
+      </div>
+      {err && <div className="alert alert-error">{err}</div>}
+      <div className="field">
+        <label>Client Name *</label>
+        <input value={form.clientName} onChange={set("clientName")} placeholder="Jane Smith" />
+      </div>
+      <div className="field">
+        <label>Client Email *</label>
+        <input value={form.clientEmail} onChange={set("clientEmail")} placeholder="jane@example.com" type="email" />
+      </div>
+      <div className="field">
+        <label>Client Mobile <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+        <input value={form.clientMobile} onChange={set("clientMobile")} placeholder="04XX XXX XXX" type="tel" />
+      </div>
+      <div className="field">
+        <label>Client Situation *</label>
+        <textarea value={form.situation} onChange={set("situation")} rows={5} placeholder="Describe the client and their situation — their property goals, budget, timeline, and any relevant context that will help our team assist them…" style={{resize:"vertical"}} />
+      </div>
+      <div className="divider" />
+      <div className="row" style={{justifyContent:"flex-end"}}>
+        <button className="btn btn-primary" onClick={submit} disabled={loading} style={{background:"#7a4a00",borderColor:"#7a4a00"}}>{loading?"Submitting…":"Submit Referral →"}</button>
+      </div>
+    </div>
+  );
+}
+
 // ── Broker Requests (combined) ────────────────────────────────────────────────
 function BrokerRequests({ requests }) {
   const [filter,     setFilter]     = useState("all");
@@ -915,7 +1057,7 @@ function BrokerRequests({ requests }) {
           </div>
           <div style={{width:1,height:24,background:"var(--border)"}} />
           <div className="row" style={{gap:6}}>
-            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 CMA"]].map(([v,l])=>(
+            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 CMA"],["referral","🤝 Referral"]].map(([v,l])=>(
               <button key={v} className="btn btn-secondary btn-sm" onClick={()=>setTypeFilter(v)}
                 style={{borderColor:typeFilter===v?"var(--primary)":"var(--border-strong)",fontWeight:typeFilter===v?700:400}}>{l}</button>
             ))}
@@ -928,7 +1070,7 @@ function BrokerRequests({ requests }) {
               <tr key={r.id}>
                 <td><TypeBadge t={r.type} /></td>
                 <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
-                <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":fmtMoney(r.expectedValue)}</span></td>
+                <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":r.type==="referral"?r.clientName||"Client":fmtMoney(r.expectedValue)}</span></td>
                 <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
                 <td><StatusBadge s={r.status} /></td>
                 <td>{r.status==="complete"&&r.downloadUrl
@@ -952,8 +1094,9 @@ function StatusBadge({ s }) {
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 function TypeBadge({ t }) {
-  if (t==="cma")  return <span className="badge badge-cma">🏡 CMA</span>;
-  if (t==="pdr")  return <span className="badge badge-pdr">🔍 PDR</span>;
+  if (t==="cma")      return <span className="badge badge-cma">🏡 CMA</span>;
+  if (t==="pdr")      return <span className="badge badge-pdr">🔍 PDR</span>;
+  if (t==="referral") return <span className="badge badge-referral">🤝 Referral</span>;
   return <span className="badge badge-rent">📄 Rent</span>;
 }
 function Detail({ label, val, full }) {
