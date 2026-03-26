@@ -739,7 +739,7 @@ function BrokerDashboard({ session, requests, setPage }) {
                   <td style={{fontSize:13}}>{r.address}</td>
                   <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
                   <td><StatusBadge s={r.status} /></td>
-                  <td>{r.status==="complete"&&r.downloadUrl&&<a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">⬇️ Download</a>}</td>
+                  <td>{r.status==="complete"&&r.downloadUrl&&<a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">⬇️</a>}</td>
                 </tr>
               ))}
             </tbody>
@@ -932,7 +932,7 @@ function BrokerRequests({ requests }) {
                 <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
                 <td><StatusBadge s={r.status} /></td>
                 <td>{r.status==="complete"&&r.downloadUrl
-                  ? <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">⬇️ Download</a>
+                  ? <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">⬇️</a>
                   : <span style={{fontSize:12,color:"#bbb"}}>Pending</span>}
                 </td>
               </tr>
