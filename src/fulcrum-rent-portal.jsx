@@ -217,8 +217,10 @@ async function sendWhatsApp(message) {
 async function sendEmail(templateId, params) {
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, templateId, params, { publicKey: EMAILJS_PUBLIC_KEY });
+    return true;
   } catch(e) {
     console.error("EmailJS error:", e.status, e.text, JSON.stringify(e));
+    return false;
   }
 }
 
@@ -277,10 +279,16 @@ const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const initSession = (() => { try { const s = localStorage.getItem("fa:session"); return s ? JSON.parse(s) : null; } catch { return null; } })();
+  const initView = (() => {
+    if (initSession) return "dashboard";
+    const p = new URLSearchParams(window.location.search);
+    if (p.get("view") === "reset" && p.get("email") && p.get("token")) return "reset";
+    return "login";
+  })();
   const [users,    setUsers]    = useState([]);
   const [requests, setRequests] = useState([]);
   const [session,  setSession]  = useState(initSession);
-  const [view,     setView]     = useState(initSession ? "dashboard" : "login");
+  const [view,     setView]     = useState(initView);
   const [page,     setPage]     = useState("dashboard");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
@@ -323,6 +331,33 @@ export default function App() {
     return null;
   };
 
+  const forgotPassword = async email => {
+    const normalised = email.trim().toLowerCase();
+    const user = users.find(x => x.email.toLowerCase() === normalised);
+    if (user) {
+      const token = globalThis.crypto?.randomUUID?.() || `${uid()}-${uid()}-${Date.now()}`;
+      const baseUrl = window.location.origin.includes("localhost") ? "http://localhost:3000" : window.location.origin;
+      const resetLink = `${baseUrl}?view=reset&email=${encodeURIComponent(normalised)}&token=${encodeURIComponent(token)}`;
+      const sent = await sendEmail("template_w5i9cdv", {
+        to_email: normalised, user_name: user.name || "", reset_link: resetLink, expiry_time: "1 hour"
+      });
+      if (!sent) return "We couldn't send the reset email right now. Please try again.";
+      await saveUsers(users.map(u => u.id === user.id ? { ...u, resetToken: token, resetTokenExpiresAt: Date.now() + 3600000 } : u));
+    }
+    return "If that email exists, password reset instructions have been sent.";
+  };
+
+  const resetPassword = async (email, token, newPassword) => {
+    const normalised = email.trim().toLowerCase();
+    const user = users.find(x => x.email.toLowerCase() === normalised);
+    if (!user || user.resetToken !== token || !user.resetTokenExpiresAt || user.resetTokenExpiresAt <= Date.now()) {
+      return "This reset link is invalid or has expired.";
+    }
+    // TODO: migrate password storage to hashed passwords
+    await saveUsers(users.map(u => u.id === user.id ? { ...u, password: newPassword, resetToken: null, resetTokenExpiresAt: null } : u));
+    return null;
+  };
+
   const approveUser   = async id => saveUsers(users.map(u => u.id === id ? { ...u, status: "approved" } : u));
   const rejectUser    = async id => saveUsers(users.filter(u => u.id !== id));
   const submitRequest = async data => {
@@ -355,8 +390,10 @@ export default function App() {
           <button className="btn btn-secondary btn-sm" onClick={() => setShowInstall(false)}>✕</button>
         </div>
       )}
-      {view==="login"    && <LoginScreen onLogin={login} onRegister={() => setView("register")} />}
+      {view==="login"    && <LoginScreen onLogin={login} onRegister={() => setView("register")} onForgotPassword={() => setView("forgot")} />}
       {view==="register" && <RegisterScreen onRegister={register} onBack={() => setView("login")} />}
+      {view==="forgot"   && <ForgotPasswordScreen onForgotPassword={forgotPassword} onBack={() => setView("login")} />}
+      {view==="reset"    && <ResetPasswordScreen  onResetPassword={resetPassword}   onBack={() => setView("login")} />}
       {view==="dashboard" && session && (
         <AppShell session={session} page={page} setPage={setPage} onLogout={logout}
           users={users} requests={requests} onApprove={approveUser} onReject={rejectUser}
@@ -367,7 +404,7 @@ export default function App() {
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin, onRegister }) {
+function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
   const [email, setEmail] = useState("");
   const [pass,  setPass]  = useState("");
   const [err,   setErr]   = useState("");
@@ -383,6 +420,7 @@ function LoginScreen({ onLogin, onRegister }) {
         <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit}>Sign In →</button>
         <div className="divider" />
         <p style={{fontSize:14,color:"#888",textAlign:"center"}}>New broker? <span className="text-link" onClick={onRegister}>Request access</span></p>
+        <p style={{fontSize:13,color:"#aaa",textAlign:"center",marginTop:8}}><span className="text-link" onClick={onForgotPassword}>Forgot password?</span></p>
         <p style={{fontSize:11,color:"#ccc",textAlign:"center",marginTop:16}}>
           Staff: admin@fulcrumaustralia.com.au / admin123<br/>
           Staff: staff@fulcrumaustralia.com.au / staff123<br/>
@@ -439,6 +477,114 @@ function RegisterScreen({ onRegister, onBack }) {
       </div>
       <div className="auth-deco">
         <div className="deco-quote">Trusted by Perth mortgage brokers for fast, accurate property reports.</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Forgot Password ───────────────────────────────────────────────────────────
+function ForgotPasswordScreen({ onForgotPassword, onBack }) {
+  const [email,   setEmail]   = useState("");
+  const [err,     setErr]     = useState("");
+  const [done,    setDone]    = useState(false);
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!email.trim()) return setErr("Please enter your email address.");
+    setErr(""); setLoading(true);
+    const result = await onForgotPassword(email);
+    setLoading(false);
+    if (result && result.startsWith("We couldn't")) { setErr(result); }
+    else { setDone(true); }
+  };
+  return (
+    <div className="auth-shell">
+      <div className="auth-panel">
+        <div className="auth-brand"><img src="/Full Logo Light BG, Dark Text.png" style={{maxWidth:180,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
+        <div className="auth-title">Reset Password</div>
+        {done ? (
+          <div>
+            <div className="alert alert-success" style={{fontSize:15,padding:"20px 24px"}}>✅ If that email exists, password reset instructions have been sent.</div>
+            <button className="btn btn-secondary mt" onClick={onBack}>← Back to Sign In</button>
+          </div>
+        ) : (
+          <>
+            {err && <div className="alert alert-error">{err}</div>}
+            <p style={{fontSize:14,color:"#888",marginBottom:16}}>Enter your email address and we'll send you a link to reset your password.</p>
+            <div className="field"><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="you@example.com" /></div>
+            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Sending…" : "Send Reset Link →"}</button>
+            <div className="divider" />
+            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={onBack}>← Back to Sign In</span></p>
+          </>
+        )}
+      </div>
+      <div className="auth-deco">
+        <div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div>
+      </div>
+    </div>
+  );
+}
+
+// ── Reset Password ────────────────────────────────────────────────────────────
+function ResetPasswordScreen({ onResetPassword, onBack }) {
+  const params = new URLSearchParams(window.location.search);
+  const [urlEmail] = useState(params.get("email") || "");
+  const [urlToken] = useState(params.get("token") || "");
+  const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
+  const [err,      setErr]      = useState("");
+  const [done,     setDone]     = useState(false);
+  const [loading,  setLoading]  = useState(false);
+
+  if (!urlEmail || !urlToken) {
+    return (
+      <div className="auth-shell">
+        <div className="auth-panel">
+          <div className="auth-brand"><img src="/Full Logo Light BG, Dark Text.png" style={{maxWidth:180,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
+          <div className="auth-title">Reset Password</div>
+          <div className="alert alert-error">This reset link is invalid.</div>
+          <button className="btn btn-secondary mt" onClick={onBack}>← Back to Sign In</button>
+        </div>
+        <div className="auth-deco"><div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div></div>
+      </div>
+    );
+  }
+
+  const submit = async () => {
+    if (password.length < 8) return setErr("Password must be at least 8 characters.");
+    if (password !== confirm) return setErr("Passwords do not match.");
+    setErr(""); setLoading(true);
+    const result = await onResetPassword(urlEmail, urlToken, password);
+    setLoading(false);
+    if (result) { setErr(result); }
+    else {
+      window.history.replaceState({}, "", window.location.pathname);
+      setDone(true);
+    }
+  };
+
+  return (
+    <div className="auth-shell">
+      <div className="auth-panel">
+        <div className="auth-brand"><img src="/Full Logo Light BG, Dark Text.png" style={{maxWidth:180,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
+        <div className="auth-title">Set New Password</div>
+        {done ? (
+          <div>
+            <div className="alert alert-success" style={{fontSize:15,padding:"20px 24px"}}>✅ Your password has been reset. You can now sign in.</div>
+            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:16}} onClick={onBack}>Sign In →</button>
+          </div>
+        ) : (
+          <>
+            {err && <div className="alert alert-error">{err}</div>}
+            <div className="field"><label>New Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
+            <div className="field"><label>Confirm Password</label><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
+            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Saving…" : "Reset Password →"}</button>
+            <div className="divider" />
+            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={onBack}>← Back to Sign In</span></p>
+          </>
+        )}
+      </div>
+      <div className="auth-deco">
+        <div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div>
       </div>
     </div>
   );
