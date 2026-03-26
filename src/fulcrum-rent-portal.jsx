@@ -896,7 +896,7 @@ function NewRequest({ onSubmit, onDone }) {
               <div className="type-card-title">Price Discovery Report</div>
               <div className="type-card-desc">Send a detailed questionnaire to your client to understand their purchasing parameters — budget, property type, location and investment goals. You'll receive a report confirming what's achievable.</div>
             </div>
-            <div className={`type-card${type==="referral"?" sel-gold":""}`} onClick={()=>setType("referral")} style={{gridColumn:"1/-1",borderColor:type==="referral"?"#7a4a00":"",background:type==="referral"?"#fef3e2":""}}>
+            <div className={`type-card${type==="referral"?" sel-gold":""}`} onClick={()=>setType("referral")} style={{borderColor:type==="referral"?"#7a4a00":"",background:type==="referral"?"#fef3e2":""}}>
               <div className="type-card-icon">🤝</div>
               <div className="type-card-title">Client Referral</div>
               <div className="type-card-desc">Refer a client to Fulcrum Australia for professional property buying services. Our buyers agency team will follow up directly with your client.</div>
