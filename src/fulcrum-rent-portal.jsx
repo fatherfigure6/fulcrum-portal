@@ -202,6 +202,18 @@ const EMAILJS_TEMPLATE_STAFF = "template_6hsug16"; // {{email}} + CC haley
 const EMAILJS_TEMPLATE_USER  = "template_ygh6vso"; // {{to_email}}
 const EMAILJS_PUBLIC_KEY     = "cNWxMfTQGxmZ0DZ3k";
 
+const WA_PHONE  = "61400198676";
+const WA_APIKEY = "4388573";
+
+async function sendWhatsApp(message) {
+  try {
+    const url = `https://api.callmebot.com/whatsapp.php?phone=${WA_PHONE}&text=${encodeURIComponent(message)}&apikey=${WA_APIKEY}`;
+    await fetch(url);
+  } catch(e) {
+    console.error("WhatsApp notification error:", e);
+  }
+}
+
 async function sendEmail(templateId, params) {
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, templateId, params, { publicKey: EMAILJS_PUBLIC_KEY });
@@ -307,6 +319,7 @@ export default function App() {
       subject: "New Broker Registration — Pending Approval",
       message: `A new broker has registered and requires approval.\n\nName: ${data.name}\nCompany: ${data.company}\nEmail: ${data.email}\nPhone: ${data.phone || "—"}\n\nLog in to the portal to approve or reject this account.`
     });
+    sendWhatsApp(`New Broker Registration\n${data.name} (${data.company}) has registered and is awaiting approval.`);
     return null;
   };
 
@@ -324,6 +337,7 @@ export default function App() {
       subject: `New ${typeLabel} — ${session.name} (${session.company})`,
       message
     });
+    sendWhatsApp(`New ${typeLabel}\nFrom: ${session.name} (${session.company})\n${data.type === "referral" ? `Client: ${data.clientName}` : `Property: ${data.address || "—"}`}`);
     return req;
   };
   const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
@@ -1157,6 +1171,7 @@ export function PDRPublicForm() {
         subject: `New PDR Submission — ${form.clientName}`,
         message: `A new Price Discovery Report request has been submitted.\n\nClient: ${form.clientName}\nEmail: ${form.clientEmail}\nMobile: ${form.clientMobile}\nBudget: ${form.budgetMin ? `$${Number(form.budgetMin).toLocaleString()} – ` : ""}$${Number(form.budgetMax).toLocaleString()}\nLocations: ${form.locations}\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review and complete this request.`
       });
+      sendWhatsApp(`New PDR Submission\nClient: ${form.clientName}\nEmail: ${form.clientEmail}\nMobile: ${form.clientMobile || "—"}`);
       setDone(true);
     } catch { setErr("Something went wrong. Please try again."); }
   };
