@@ -174,7 +174,7 @@ async function sendEmail(templateId, params) {
   try {
     await emailjs.send(EMAILJS_SERVICE_ID, templateId, params, { publicKey: EMAILJS_PUBLIC_KEY });
   } catch(e) {
-    console.error("EmailJS error:", e);
+    console.error("EmailJS error:", e.status, e.text, JSON.stringify(e));
   }
 }
 
