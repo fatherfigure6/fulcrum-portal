@@ -166,8 +166,8 @@ const CSS = `
 
 // ── EmailJS ───────────────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID     = "service_4xnscde";
-const EMAILJS_TEMPLATE_STAFF = "templates_6rgmqfy"; // {{email}} + CC haley
-const EMAILJS_TEMPLATE_USER  = "templates_hjpfq3h"; // {{to_email}}
+const EMAILJS_TEMPLATE_STAFF = "template_6hsug16"; // {{email}} + CC haley
+const EMAILJS_TEMPLATE_USER  = "template_ygh6vso"; // {{to_email}}
 const EMAILJS_PUBLIC_KEY     = "cNWxMfTQGxmZ0DZ3k";
 
 async function sendEmail(templateId, params) {
