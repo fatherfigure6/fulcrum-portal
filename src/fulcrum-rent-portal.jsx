@@ -205,10 +205,10 @@ const EMAILJS_PUBLIC_KEY     = "cNWxMfTQGxmZ0DZ3k";
 const WA_PHONE  = "61400198676";
 const WA_APIKEY = "4388573";
 
-async function sendWhatsApp(message) {
+function sendWhatsApp(message) {
   try {
     const url = `https://api.callmebot.com/whatsapp.php?phone=${WA_PHONE}&text=${encodeURIComponent(message)}&apikey=${WA_APIKEY}`;
-    await fetch(url, { mode: "no-cors" });
+    new Image().src = url;
   } catch(e) {
     console.error("WhatsApp notification error:", e);
   }
