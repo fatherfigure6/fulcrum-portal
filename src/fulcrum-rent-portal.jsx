@@ -232,10 +232,11 @@ const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  const initSession = (() => { try { const s = localStorage.getItem("fa:session"); return s ? JSON.parse(s) : null; } catch { return null; } })();
   const [users,    setUsers]    = useState([]);
   const [requests, setRequests] = useState([]);
-  const [session,  setSession]  = useState(null);
-  const [view,     setView]     = useState("login");
+  const [session,  setSession]  = useState(initSession);
+  const [view,     setView]     = useState(initSession ? "dashboard" : "login");
   const [page,     setPage]     = useState("dashboard");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
@@ -247,18 +248,6 @@ export default function App() {
       if (!u || u.length === 0) { u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS]; await store.set("fa:users", u); }
       let r = await store.get("fa:requests");
       if (!r) { r = []; await store.set("fa:requests", r); }
-      try {
-        const saved = sessionStorage.getItem("fa:session");
-        if (saved) {
-          const savedUser = JSON.parse(saved);
-          const current = u.find(x => x.id === savedUser.id);
-          if (current && (current.role === "staff" || current.status === "approved")) {
-            setSession(current); setView("dashboard");
-          } else {
-            sessionStorage.removeItem("fa:session");
-          }
-        }
-      } catch {}
       setUsers(u); setRequests(r); setLoaded(true);
     })();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
@@ -271,10 +260,10 @@ export default function App() {
     const u = users.find(x => x.email.toLowerCase() === email.toLowerCase() && x.password === password);
     if (!u) return "Invalid email or password.";
     if (u.role === "broker" && u.status !== "approved") return "Your account is pending approval.";
-    sessionStorage.setItem("fa:session", JSON.stringify(u));
+    localStorage.setItem("fa:session", JSON.stringify(u));
     setSession(u); setView("dashboard"); setPage("dashboard"); return null;
   };
-  const logout = () => { sessionStorage.removeItem("fa:session"); setSession(null); setView("login"); };
+  const logout = () => { localStorage.removeItem("fa:session"); setSession(null); setView("login"); };
 
   const register = async data => {
     if (users.find(x => x.email.toLowerCase() === data.email.toLowerCase())) return "Email already registered.";
