@@ -239,7 +239,7 @@ export default function App() {
   const [page,     setPage]     = useState("dashboard");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
-  const loaded = useRef(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -259,7 +259,7 @@ export default function App() {
           }
         }
       } catch {}
-      setUsers(u); setRequests(r); loaded.current = true;
+      setUsers(u); setRequests(r); setLoaded(true);
     })();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
   }, []);
@@ -302,7 +302,7 @@ export default function App() {
   };
   const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
 
-  if (!loaded.current) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
+  if (!loaded) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
 
   return (
     <>
