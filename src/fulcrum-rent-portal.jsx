@@ -11,9 +11,11 @@ const supabase      = createClient(SUPABASE_URL, SUPABASE_KEY);
 const store = {
   async get(key) {
     try {
-      const { data } = await supabase.from("kv_store").select("value").eq("key", key).single();
+      const { data, error } = await supabase.from("kv_store").select("value").eq("key", key).single();
+      if (error?.code === "PGRST116") return null; // row not found — safe to seed
+      if (error) return undefined;                 // real error — do not overwrite
       return data ? JSON.parse(data.value) : null;
-    } catch { return null; }
+    } catch { return undefined; }
   },
   async set(key, val) {
     try {
@@ -274,9 +276,11 @@ export default function App() {
   useEffect(() => {
     (async () => {
       let u = await store.get("fa:users");
-      if (!u || u.length === 0) { u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS]; await store.set("fa:users", u); }
+      if (u === null) { u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS]; await store.set("fa:users", u); }
+      else if (!u) u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS];
       let r = await store.get("fa:requests");
-      if (!r) { r = []; await store.set("fa:requests", r); }
+      if (r === null) { r = []; await store.set("fa:requests", r); }
+      else if (!r) r = [];
       setUsers(u); setRequests(r); setLoaded(true);
     })();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
