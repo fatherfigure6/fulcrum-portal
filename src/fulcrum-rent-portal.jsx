@@ -172,7 +172,7 @@ const EMAILJS_PUBLIC_KEY     = "cNWxMfTQGxmZ0DZ3k";
 
 async function sendEmail(templateId, params) {
   try {
-    await emailjs.send(EMAILJS_SERVICE_ID, templateId, params, EMAILJS_PUBLIC_KEY);
+    await emailjs.send(EMAILJS_SERVICE_ID, templateId, params, { publicKey: EMAILJS_PUBLIC_KEY });
   } catch(e) {
     console.error("EmailJS error:", e);
   }
