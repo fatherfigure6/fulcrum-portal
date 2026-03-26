@@ -176,7 +176,9 @@ const CSS = `
     .bottom-nav-icon { font-size:20px; line-height:1; }
     .bottom-nav-label { font-size:9px; letter-spacing:.3px; text-transform:uppercase; font-weight:500; }
     .bottom-nav-badge { position:absolute; top:5px; left:calc(50% + 6px); background:#b04040; color:#fff; border-radius:10px; padding:1px 5px; font-size:9px; font-weight:700; line-height:1.4; }
-    .stats { grid-template-columns:1fr 1fr; }
+    .stats { grid-template-columns:repeat(6,1fr) !important; }
+    .stats .stat { grid-column:span 2; }
+    .stats .stat:nth-child(4),.stats .stat:nth-child(5) { grid-column:span 3; }
     .page-title { font-size:20px; }
     .page-header { margin-bottom:18px; }
     .card { padding:14px 14px; overflow-x:auto; }
