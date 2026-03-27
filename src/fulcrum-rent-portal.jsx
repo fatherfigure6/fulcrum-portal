@@ -324,6 +324,11 @@ export default function App() {
         setView("login");
       }
     });
+
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s?.user && !recovering.current) loadProfile(s.user.id);
+      else if (!s) setView(v => v === "loading" ? "login" : v);
+    });
     (async () => {
       let r = await store.get("fa:requests");
       if (r === null) { r = []; await store.set("fa:requests", r); }
