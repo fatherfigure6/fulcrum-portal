@@ -966,16 +966,17 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
       <div className="card">
         <div className="card-title">✅ Approved Brokers ({approved.length})</div>
         <table className="tbl">
-          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th></tr></thead>
+          <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {approved.map(b=>(
               <tr key={b.id}>
                 <td><strong>{b.name}</strong></td><td>{b.company}</td>
                 <td style={{fontSize:13}}>{b.email}</td>
                 <td>{b.mustChangePassword ? <span className="badge badge-pending">Temp password</span> : <StatusBadge s="approved" />}</td>
+                <td><button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) onReject(b.id); }}>Remove</button></td>
               </tr>
             ))}
-            {approved.length===0 && <tr><td colSpan={4}><div className="empty">No approved brokers yet</div></td></tr>}
+            {approved.length===0 && <tr><td colSpan={5}><div className="empty">No approved brokers yet</div></td></tr>}
           </tbody>
         </table>
       </div>
