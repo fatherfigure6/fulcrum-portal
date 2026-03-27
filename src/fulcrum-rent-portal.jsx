@@ -3,9 +3,10 @@ import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
-const SUPABASE_URL  = "https://peirfbpszurwsxmffnyu.supabase.co";
-const SUPABASE_KEY  = "sb_publishable_SVHVaY9hBjzNYmJk-hfN-w_r6q8VrnG";
-const supabase      = createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 // ── Persistent storage helpers ──────────────────────────────────────────────
 const store = {
@@ -23,13 +24,6 @@ const store = {
     } catch {}
   }
 };
-
-// ── Seed data ────────────────────────────────────────────────────────────────
-const SEED_ADMIN  = { id:"admin", name:"Admin",       email:"admin@fulcrumaustralia.com.au", password:"admin123", role:"staff" };
-const SEED_STAFF  = { id:"s1",   name:"Perth Rental", email:"staff@fulcrumaustralia.com.au", password:"staff123", role:"staff" };
-const SEED_BROKERS = [
-  { id:"b1", name:"James Thornton", email:"james@gtfinance.com.au", company:"G&T Finance", password:"broker123", role:"broker", status:"approved" },
-];
 
 // ── CSS ───────────────────────────────────────────────────────────────────────
 const CSS = `
@@ -197,13 +191,13 @@ const CSS = `
 `;
 
 // ── EmailJS ───────────────────────────────────────────────────────────────────
-const EMAILJS_SERVICE_ID     = "service_4xnscde";
-const EMAILJS_TEMPLATE_STAFF = "template_6hsug16"; // {{email}} + CC haley
-const EMAILJS_TEMPLATE_USER  = "template_ygh6vso"; // {{to_email}}
-const EMAILJS_PUBLIC_KEY     = "cNWxMfTQGxmZ0DZ3k";
+const EMAILJS_SERVICE_ID     = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_STAFF = import.meta.env.VITE_EMAILJS_TEMPLATE_STAFF;
+const EMAILJS_TEMPLATE_USER  = import.meta.env.VITE_EMAILJS_TEMPLATE_USER;
+const EMAILJS_PUBLIC_KEY     = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
 
-const WA_PHONE  = "61400198676";
-const WA_APIKEY = "4388573";
+const WA_PHONE  = import.meta.env.VITE_WA_PHONE;
+const WA_APIKEY = import.meta.env.VITE_WA_APIKEY;
 
 async function sendWhatsApp(message) {
   try {
@@ -225,7 +219,7 @@ async function sendEmail(templateId, params) {
 }
 
 // ── Google Places ─────────────────────────────────────────────────────────────
-const GOOGLE_MAPS_API_KEY = "AIzaSyCzMZfp5GnTEWaOij7vRBs726XH_zrOBkg";
+const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
 
 function loadGoogleMaps() {
   if (window.google?.maps?.places) return Promise.resolve();
@@ -278,94 +272,144 @@ const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const initSession = (() => { try { const s = localStorage.getItem("fa:session"); return s ? JSON.parse(s) : null; } catch { return null; } })();
-  const initView = (() => {
-    if (initSession?.mustChangePassword) return "change-password";
-    if (initSession) return "dashboard";
-    const p = new URLSearchParams(window.location.search);
-    if (p.get("view") === "reset" && p.get("email") && p.get("token")) return "reset";
-    return "login";
-  })();
   const [users,    setUsers]    = useState([]);
   const [requests, setRequests] = useState([]);
-  const [session,  setSession]  = useState(initSession);
-  const [view,     setView]     = useState(initView);
+  const [session,  setSession]  = useState(null);
+  const [view,     setView]     = useState("loading");
   const [page,     setPage]     = useState("dashboard");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const registering = useRef(false);
+
+  const normalizeProfile = row => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    status: row.status || null,
+    company: row.company || "",
+    phone: row.phone || "",
+    mustChangePassword: row.must_change_password || false,
+  });
+
+  const loadUsers = async () => {
+    const { data } = await supabase.from("profiles").select("*");
+    setUsers((data || []).map(normalizeProfile));
+  };
+
+  const loadProfile = async userId => {
+    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+    if (!data) { await supabase.auth.signOut(); return; }
+    if (data.role === "broker" && data.status !== "approved") {
+      await supabase.auth.signOut();
+      return;
+    }
+    const profile = normalizeProfile(data);
+    setSession(profile);
+    if (profile.mustChangePassword) setView("change-password");
+    else { setView("dashboard"); setPage("dashboard"); }
+    if (profile.role === "staff") await loadUsers();
+  };
 
   useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSess) => {
+      if (event === "PASSWORD_RECOVERY") { setView("reset"); return; }
+      if (event === "USER_UPDATED") return;
+      if (authSess?.user && !registering.current) {
+        await loadProfile(authSess.user.id);
+      } else if (!authSess?.user) {
+        setSession(null);
+        setView("login");
+      }
+    });
     (async () => {
-      let u = await store.get("fa:users");
-      if (u === null) { u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS]; await store.set("fa:users", u); }
-      else if (!u) u = [SEED_ADMIN, SEED_STAFF, ...SEED_BROKERS];
       let r = await store.get("fa:requests");
       if (r === null) { r = []; await store.set("fa:requests", r); }
       else if (!r) r = [];
-      setUsers(u); setRequests(r); setLoaded(true);
+      setRequests(r);
     })();
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
+    return () => subscription.unsubscribe();
   }, []);
 
-  const saveUsers    = async u => { setUsers(u);    await store.set("fa:users",    u); };
   const saveRequests = async r => { setRequests(r); await store.set("fa:requests", r); };
 
-  const login = (email, password) => {
-    const u = users.find(x => x.email.toLowerCase() === email.toLowerCase() && x.password === password);
-    if (!u) return "Invalid email or password.";
-    if (u.role === "broker" && u.status !== "approved") return "Your account is pending approval.";
-    const { password: _pw, ...safeUser } = u; // never store raw password in localStorage
-    if (u.mustChangePassword) {
-      localStorage.setItem("fa:session", JSON.stringify(safeUser));
-      setSession(safeUser); setView("change-password"); return null;
+  const login = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+    if (error) return "Invalid email or password.";
+    const { data: profile } = await supabase.from("profiles").select("role,status").eq("id", data.user.id).single();
+    if (profile?.role === "broker" && profile?.status !== "approved") {
+      await supabase.auth.signOut();
+      return "Your account is pending approval.";
     }
-    localStorage.setItem("fa:session", JSON.stringify(safeUser));
-    setSession(safeUser); setView("dashboard"); setPage("dashboard"); return null;
+    return null;
   };
-  const logout = () => { localStorage.removeItem("fa:session"); setSession(null); setView("login"); };
+
+  const logout = async () => { await supabase.auth.signOut(); };
 
   const register = async data => {
-    if (users.find(x => x.email.toLowerCase() === data.email.toLowerCase())) return "Email already registered.";
-    await saveUsers([...users, { ...data, id: uid(), role: "broker", status: "pending" }]);
-    sendEmail(EMAILJS_TEMPLATE_STAFF, {
-      email: "brian@fulcrumaustralia.com.au",
-      subject: "New Broker Registration — Pending Approval",
-      message: `A new broker has registered and requires approval.\n\nName: ${data.name}\nCompany: ${data.company}\nEmail: ${data.email}\nPhone: ${data.phone || "—"}\n\nLog in to the portal to approve or reject this account.`
-    });
-    sendWhatsApp(`New Broker Registration\n${data.name} (${data.company}) has registered and is awaiting approval.`);
-    return null;
+    registering.current = true;
+    try {
+      const { data: signupData, error } = await supabase.auth.signUp({
+        email: data.email.trim().toLowerCase(),
+        password: data.password,
+      });
+      if (error) {
+        if (error.message.toLowerCase().includes("already")) return "Email already registered.";
+        return error.message;
+      }
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: signupData.user.id,
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+        role: "broker",
+        status: "pending",
+        company: data.company.trim(),
+        phone: data.phone?.trim() || null,
+        must_change_password: false,
+      });
+      if (profileError) {
+        await supabase.auth.signOut();
+        return "Registration failed. Please try again.";
+      }
+      await supabase.auth.signOut();
+      sendEmail(EMAILJS_TEMPLATE_STAFF, {
+        email: "brian@fulcrumaustralia.com.au",
+        subject: "New Broker Registration — Pending Approval",
+        message: `A new broker has registered and requires approval.\n\nName: ${data.name}\nCompany: ${data.company}\nEmail: ${data.email}\nPhone: ${data.phone || "—"}\n\nLog in to the portal to approve or reject this account.`
+      });
+      sendWhatsApp(`New Broker Registration\n${data.name} (${data.company}) has registered and is awaiting approval.`);
+      return null;
+    } finally {
+      registering.current = false;
+    }
   };
 
   const forgotPassword = async email => {
-    const normalised = email.trim().toLowerCase();
-    const user = users.find(x => x.email.toLowerCase() === normalised);
-    if (user) {
-      const token = globalThis.crypto?.randomUUID?.() || `${uid()}-${uid()}-${Date.now()}`;
-      const baseUrl = window.location.origin.includes("localhost") ? "http://localhost:3000" : window.location.origin;
-      const resetLink = `${baseUrl}?view=reset&email=${encodeURIComponent(normalised)}&token=${encodeURIComponent(token)}`;
-      const sent = await sendEmail("template_w5i9cdv", {
-        email: normalised, user_name: user.name || "", reset_link: resetLink, expiry_time: "1 hour"
-      });
-      if (!sent) return "We couldn't send the reset email right now. Please try again.";
-      await saveUsers(users.map(u => u.id === user.id ? { ...u, resetToken: token, resetTokenExpiresAt: Date.now() + 3600000 } : u));
-    }
+    await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo: window.location.origin,
+    });
     return "If that email exists, password reset instructions have been sent.";
   };
 
-  const resetPassword = async (email, token, newPassword) => {
-    const normalised = email.trim().toLowerCase();
-    const user = users.find(x => x.email.toLowerCase() === normalised);
-    if (!user || user.resetToken !== token || !user.resetTokenExpiresAt || user.resetTokenExpiresAt <= Date.now()) {
-      return "This reset link is invalid or has expired.";
-    }
-    // TODO: migrate password storage to hashed passwords
-    await saveUsers(users.map(u => u.id === user.id ? { ...u, password: newPassword, resetToken: null, resetTokenExpiresAt: null } : u));
+  const resetPassword = async password => {
+    if (password.length < 8) return "Password must be at least 8 characters.";
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return error.message;
     return null;
   };
 
-  const approveUser   = async id => saveUsers(users.map(u => u.id === id ? { ...u, status: "approved" } : u));
-  const rejectUser    = async id => saveUsers(users.filter(u => u.id !== id));
+  const approveUser = async id => {
+    await supabase.from("profiles").update({ status: "approved" }).eq("id", id);
+    setUsers(users.map(u => u.id === id ? { ...u, status: "approved" } : u));
+  };
+
+  const rejectUser = async id => {
+    const { data } = await supabase.functions.invoke("admin-delete-user", { body: { userId: id } });
+    if (data?.error) return;
+    setUsers(users.filter(u => u.id !== id));
+  };
+
   const addStaff = async data => {
     const name  = data.name?.trim()  || "";
     const email = data.email?.trim().toLowerCase() || "";
@@ -374,47 +418,59 @@ export default function App() {
     if (!email) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
     if (!password || password.length < 8) return "Temporary password must be at least 8 characters.";
-    if (users.find(x => x.email.toLowerCase() === email)) return "Email already registered.";
-    await saveUsers([...users, {
-      id: uid(), name, email, password,
-      role: "staff", mustChangePassword: true,
-      resetToken: null, resetTokenExpiresAt: null
-    }]);
+    const { data: result } = await supabase.functions.invoke("admin-create-user", {
+      body: { email, password, name, role: "staff", mustChangePassword: true }
+    });
+    if (result?.error) return result.error;
+    setUsers([...users, { id: result.id, name, email, role: "staff", status: null, company: "", phone: "", mustChangePassword: true }]);
     return null;
   };
+
   const removeStaff = async (id, currentUserId) => {
     if (id === currentUserId) return "You cannot remove your own account.";
     const target = users.find(u => u.id === id);
     if (!target || target.role !== "staff") return "Staff account not found.";
     const remainingStaff = users.filter(u => u.role === "staff" && u.id !== id);
     if (remainingStaff.length === 0) return "Cannot remove the last staff account.";
-    await saveUsers(users.filter(u => !(u.id === id && u.role === "staff")));
+    const { data } = await supabase.functions.invoke("admin-delete-user", { body: { userId: id } });
+    if (data?.error) return data.error;
+    setUsers(users.filter(u => u.id !== id));
     return null;
   };
+
   const addBroker = async data => {
     if (!data.tempPassword || data.tempPassword.length < 8) return "Temporary password must be at least 8 characters.";
-    if (users.find(x => x.email.toLowerCase() === data.email.trim().toLowerCase())) return "Email already registered.";
-    await saveUsers([...users, {
-      id: uid(), name: data.name.trim(), email: data.email.trim().toLowerCase(),
+    const { data: result } = await supabase.functions.invoke("admin-create-user", {
+      body: {
+        email: data.email.trim().toLowerCase(),
+        password: data.tempPassword,
+        name: data.name.trim(),
+        role: "broker",
+        company: data.company.trim(),
+        phone: data.phone?.trim() || null,
+        mustChangePassword: true,
+      }
+    });
+    if (result?.error) return result.error;
+    setUsers([...users, {
+      id: result.id, name: data.name.trim(), email: data.email.trim().toLowerCase(),
       company: data.company.trim(), phone: data.phone?.trim() || "",
-      password: data.tempPassword, role: "broker", status: "approved",
-      mustChangePassword: true, resetToken: null, resetTokenExpiresAt: null
+      role: "broker", status: "approved", mustChangePassword: true,
     }]);
     return null;
   };
+
   const changePassword = async newPassword => {
-    if (!session?.id) return "Session expired. Please log in again.";
     if (newPassword.length < 8) return "Password must be at least 8 characters.";
-    const currentUser = users.find(u => u.id === session.id);
-    if (!currentUser) return "User not found. Please log in again.";
-    if (newPassword === currentUser.password) return "New password must be different from the temporary password.";
-    // TODO: migrate password storage to hashed passwords
-    await saveUsers(users.map(u => u.id === session.id ? { ...u, password: newPassword, mustChangePassword: false } : u));
-    const { password: _pw, ...safeSession } = { ...session, mustChangePassword: false };
-    localStorage.setItem("fa:session", JSON.stringify(safeSession));
-    setSession(safeSession); setView("dashboard"); setPage("dashboard");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return error.message;
+    await supabase.from("profiles").update({ must_change_password: false }).eq("id", session.id);
+    setSession({ ...session, mustChangePassword: false });
+    setView("dashboard");
+    setPage("dashboard");
     return null;
   };
+
   const submitRequest = async data => {
     const req = { ...data, id: uid(), brokerId: session.id, brokerName: session.name, brokerEmail: session.email, brokerCompany: session.company, status: "pending", createdAt: Date.now(), completedAt: null, downloadUrl: null };
     await saveRequests([req, ...requests]);
@@ -430,9 +486,10 @@ export default function App() {
     sendWhatsApp(`New ${typeLabel}\nFrom: ${session.name} (${session.company})\n${data.type === "referral" ? `Client: ${data.clientName}` : `Property: ${data.address || "—"}`}`);
     return req;
   };
+
   const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
 
-  if (!loaded && !session) return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
+  if (view === "loading") return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
 
   return (
     <>
@@ -448,7 +505,7 @@ export default function App() {
       {view==="login"           && <LoginScreen onLogin={login} onRegister={() => setView("register")} onForgotPassword={() => setView("forgot")} />}
       {view==="register"        && <RegisterScreen onRegister={register} onBack={() => setView("login")} />}
       {view==="forgot"          && <ForgotPasswordScreen onForgotPassword={forgotPassword} onBack={() => setView("login")} />}
-      {view==="reset"           && <ResetPasswordScreen  onResetPassword={resetPassword}   onBack={() => setView("login")} />}
+      {view==="reset"           && <ResetPasswordScreen onResetPassword={resetPassword} onBack={async () => { await supabase.auth.signOut(); setView("login"); }} />}
       {view==="change-password" && session && <ChangePasswordScreen onChangePassword={changePassword} />}
       {view==="dashboard" && session && (
         <AppShell session={session} setView={setView} page={page} setPage={setPage} onLogout={logout}
@@ -465,7 +522,8 @@ function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
   const [email, setEmail] = useState("");
   const [pass,  setPass]  = useState("");
   const [err,   setErr]   = useState("");
-  const submit = () => { const e = onLogin(email, pass); if (e) setErr(e); };
+  const [loading, setLoading] = useState(false);
+  const submit = async () => { setErr(""); setLoading(true); const e = await onLogin(email, pass); setLoading(false); if (e) setErr(e); };
   return (
     <div className="auth-shell">
       <div className="auth-panel">
@@ -474,15 +532,10 @@ function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
         {err && <div className="alert alert-error">{err}</div>}
         <div className="field"><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="you@example.com" /></div>
         <div className="field"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••" /></div>
-        <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit}>Sign In →</button>
+        <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Signing in…" : "Sign In →"}</button>
         <div className="divider" />
         <p style={{fontSize:14,color:"#888",textAlign:"center"}}>New broker? <span className="text-link" onClick={onRegister}>Request access</span></p>
         <p style={{fontSize:13,color:"#aaa",textAlign:"center",marginTop:8}}><span className="text-link" onClick={onForgotPassword}>Forgot password?</span></p>
-        <p style={{fontSize:11,color:"#ccc",textAlign:"center",marginTop:16}}>
-          Staff: admin@fulcrumaustralia.com.au / admin123<br/>
-          Staff: staff@fulcrumaustralia.com.au / staff123<br/>
-          Broker: james@gtfinance.com.au / broker123
-        </p>
       </div>
       <div className="auth-deco">
         <div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div>
@@ -500,7 +553,7 @@ function RegisterScreen({ onRegister, onBack }) {
   const submit = async () => {
     if (!form.name||!form.email||!form.company||!form.password) return setErr("Please fill all required fields.");
     if (form.password !== form.confirm) return setErr("Passwords do not match.");
-    if (form.password.length < 6) return setErr("Password must be at least 6 characters.");
+    if (form.password.length < 8) return setErr("Password must be at least 8 characters.");
     const e = await onRegister(form); if (e) setErr(e); else setDone(true);
   };
   return (
@@ -583,40 +636,20 @@ function ForgotPasswordScreen({ onForgotPassword, onBack }) {
 
 // ── Reset Password ────────────────────────────────────────────────────────────
 function ResetPasswordScreen({ onResetPassword, onBack }) {
-  const params = new URLSearchParams(window.location.search);
-  const [urlEmail] = useState(params.get("email") || "");
-  const [urlToken] = useState(params.get("token") || "");
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
   const [err,      setErr]      = useState("");
   const [done,     setDone]     = useState(false);
   const [loading,  setLoading]  = useState(false);
 
-  if (!urlEmail || !urlToken) {
-    return (
-      <div className="auth-shell">
-        <div className="auth-panel">
-          <div className="auth-brand"><img src="/Full Logo Light BG, Dark Text.png" style={{maxWidth:180,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
-          <div className="auth-title">Reset Password</div>
-          <div className="alert alert-error">This reset link is invalid.</div>
-          <button className="btn btn-secondary mt" onClick={onBack}>← Back to Sign In</button>
-        </div>
-        <div className="auth-deco"><div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div></div>
-      </div>
-    );
-  }
-
   const submit = async () => {
     if (password.length < 8) return setErr("Password must be at least 8 characters.");
     if (password !== confirm) return setErr("Passwords do not match.");
     setErr(""); setLoading(true);
-    const result = await onResetPassword(urlEmail, urlToken, password);
+    const result = await onResetPassword(password);
     setLoading(false);
     if (result) { setErr(result); }
-    else {
-      window.history.replaceState({}, "", window.location.pathname);
-      setDone(true);
-    }
+    else { setDone(true); }
   };
 
   return (
