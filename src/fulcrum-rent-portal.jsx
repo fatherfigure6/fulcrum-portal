@@ -366,6 +366,31 @@ export default function App() {
 
   const approveUser   = async id => saveUsers(users.map(u => u.id === id ? { ...u, status: "approved" } : u));
   const rejectUser    = async id => saveUsers(users.filter(u => u.id !== id));
+  const addStaff = async data => {
+    const name  = data.name?.trim()  || "";
+    const email = data.email?.trim().toLowerCase() || "";
+    const password = data.tempPassword;
+    if (!name)  return "Full name is required.";
+    if (!email) return "Email is required.";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
+    if (!password || password.length < 8) return "Temporary password must be at least 8 characters.";
+    if (users.find(x => x.email.toLowerCase() === email)) return "Email already registered.";
+    await saveUsers([...users, {
+      id: uid(), name, email, password,
+      role: "staff", mustChangePassword: true,
+      resetToken: null, resetTokenExpiresAt: null
+    }]);
+    return null;
+  };
+  const removeStaff = async (id, currentUserId) => {
+    if (id === currentUserId) return "You cannot remove your own account.";
+    const target = users.find(u => u.id === id);
+    if (!target || target.role !== "staff") return "Staff account not found.";
+    const remainingStaff = users.filter(u => u.role === "staff" && u.id !== id);
+    if (remainingStaff.length === 0) return "Cannot remove the last staff account.";
+    await saveUsers(users.filter(u => !(u.id === id && u.role === "staff")));
+    return null;
+  };
   const addBroker = async data => {
     if (!data.tempPassword || data.tempPassword.length < 8) return "Temporary password must be at least 8 characters.";
     if (users.find(x => x.email.toLowerCase() === data.email.trim().toLowerCase())) return "Email already registered.";
@@ -428,7 +453,8 @@ export default function App() {
       {view==="dashboard" && session && (
         <AppShell session={session} setView={setView} page={page} setPage={setPage} onLogout={logout}
           users={users} requests={requests} onApprove={approveUser} onReject={rejectUser}
-          onAddBroker={addBroker} onSubmitRequest={submitRequest} onUpdateRequest={updateRequest} />
+          onAddBroker={addBroker} onSubmitRequest={submitRequest} onUpdateRequest={updateRequest}
+          onAddStaff={addStaff} onRemoveStaff={removeStaff} />
       )}
     </>
   );
@@ -654,7 +680,7 @@ function ChangePasswordScreen({ onChangePassword }) {
 }
 
 // ── App Shell ─────────────────────────────────────────────────────────────────
-function AppShell({ session, setView, page, setPage, onLogout, users, requests, onApprove, onReject, onAddBroker, onSubmitRequest, onUpdateRequest }) {
+function AppShell({ session, setView, page, setPage, onLogout, users, requests, onApprove, onReject, onAddBroker, onSubmitRequest, onUpdateRequest, onAddStaff, onRemoveStaff }) {
   useEffect(() => {
     if (session?.mustChangePassword) setView("change-password");
   }, [session]);
@@ -677,7 +703,8 @@ function AppShell({ session, setView, page, setPage, onLogout, users, requests, 
     { section:"Referrals" },
     { id:"referrals",     icon:"🤝", label:"Referrals",     badge:requests.filter(r=>r.type==="referral"&&r.status==="pending").length },
     { section:"Admin" },
-    { id:"brokers",       icon:"👥", label:"Brokers",       badge:pendingApprovals },
+    { id:"brokers",        icon:"👥", label:"Brokers",        badge:pendingApprovals },
+    { id:"staff-accounts", icon:"🔐", label:"Staff Accounts" },
   ];
   const brokerNav = [
     { id:"dashboard", icon:"🏠", label:"Dashboard" },
@@ -725,6 +752,7 @@ function AppShell({ session, setView, page, setPage, onLogout, users, requests, 
           {page==="pdr-requests"  && <AdminPDRRequests requests={requests.filter(r=>r.type==="pdr")} onUpdate={onUpdateRequest} />}
           {page==="referrals"     && <AdminReferrals  requests={requests.filter(r=>r.type==="referral")} onUpdate={onUpdateRequest} />}
           {page==="brokers"       && <AdminBrokers   users={users} onApprove={onApprove} onReject={onReject} onAddBroker={onAddBroker} />}
+          {page==="staff-accounts" && session?.role==="staff" && <AdminStaff users={users} session={session} onAddStaff={onAddStaff} onRemoveStaff={onRemoveStaff} />}
         </>}
         {isBroker && <>
           {page==="dashboard" && <BrokerDashboard session={session} requests={requests.filter(r=>r.brokerId===session.id)} setPage={setPage} />}
@@ -977,6 +1005,91 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
               </tr>
             ))}
             {approved.length===0 && <tr><td colSpan={5}><div className="empty">No approved brokers yet</div></td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
+
+// ── Admin Staff Accounts ──────────────────────────────────────────────────────
+function AdminStaff({ users, session, onAddStaff, onRemoveStaff }) {
+  if (!session || session.role !== "staff") return null;
+  const staffUsers = users.filter(u => u.role === "staff");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name:"", email:"", tempPassword:"" });
+  const [err,     setErr]     = useState("");
+  const [done,    setDone]    = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [removing, setRemoving] = useState(null);
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const submitAdd = async () => {
+    if (loading) return;
+    setErr(""); setLoading(true);
+    const result = await onAddStaff(form);
+    setLoading(false);
+    if (result) { setErr(result); }
+    else {
+      setDone(true); setForm({ name:"", email:"", tempPassword:"" }); setErr("");
+      setTimeout(() => { setDone(false); setShowForm(false); }, 2500);
+    }
+  };
+  const doRemove = async id => {
+    if (removing) return;
+    setRemoving(id);
+    const result = await onRemoveStaff(id, session.id);
+    setRemoving(null);
+    if (result) alert(result);
+  };
+  return (
+    <>
+      <div className="page-header" style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+        <div><div className="page-title">Staff Accounts</div><div className="page-sub">Add and remove staff (admin) access</div></div>
+        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(s=>!s); setErr(""); setDone(false); }}>+ Add Staff</button>
+      </div>
+      {showForm && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-title">Add Staff Account</div>
+          {done && <div className="alert alert-success" style={{marginBottom:12}}>✅ Staff account created successfully. They will be prompted to set a new password on first sign in.</div>}
+          {err  && <div className="alert alert-error"   style={{marginBottom:12}}>{err}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+            <div className="field"><label>Full Name *</label><input value={form.name} onChange={set("name")} /></div>
+            <div className="field"><label>Email *</label><input value={form.email} onChange={set("email")} /></div>
+          </div>
+          <div className="field" style={{maxWidth:300}}>
+            <label>Temporary Password * <span style={{fontSize:11,color:"#aaa",fontWeight:400}}>(min 8 characters)</span></label>
+            <input type="text" value={form.tempPassword} onChange={set("tempPassword")} placeholder="e.g. Fulcrum2024!" />
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button className="btn btn-primary btn-sm" onClick={submitAdd} disabled={loading}>{loading ? "Adding…" : "Add Staff"}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setErr(""); }}>Cancel</button>
+          </div>
+        </div>
+      )}
+      <div className="card">
+        <div className="card-title">Staff Accounts ({staffUsers.length})</div>
+        <table className="tbl">
+          <thead><tr><th>Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
+          <tbody>
+            {staffUsers.map(u => {
+              const isSelf = u.id === session.id;
+              return (
+                <tr key={u.id}>
+                  <td><strong>{u.name}</strong></td>
+                  <td style={{fontSize:13}}>{u.email}</td>
+                  <td>{u.mustChangePassword ? <span className="badge badge-pending">Temp password</span> : <span className="badge badge-approved">Active</span>}</td>
+                  <td>
+                    {isSelf
+                      ? <span style={{fontSize:12,color:"#aaa"}}>Current User</span>
+                      : <button className="btn btn-danger btn-sm" onClick={() => doRemove(u.id)} disabled={removing===u.id}>{removing===u.id ? "Removing…" : "Remove"}</button>
+                    }
+                  </td>
+                </tr>
+              );
+            })}
+            {staffUsers.filter(u => u.id !== session.id).length === 0 && (
+              <tr><td colSpan={4}><div className="empty">No other staff accounts yet.</div></td></tr>
+            )}
           </tbody>
         </table>
       </div>
