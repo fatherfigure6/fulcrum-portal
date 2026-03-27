@@ -280,6 +280,7 @@ export default function App() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
   const registering = useRef(false);
+  const recovering  = useRef(false);
 
   const normalizeProfile = row => ({
     id: row.id,
@@ -313,11 +314,12 @@ export default function App() {
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSess) => {
-      if (event === "PASSWORD_RECOVERY") { setView("reset"); return; }
-      if (event === "USER_UPDATED") return;
-      if (authSess?.user && !registering.current) {
+      if (event === "PASSWORD_RECOVERY") { recovering.current = true; setView("reset"); return; }
+      if (event === "USER_UPDATED") { recovering.current = false; return; }
+      if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setView("login"); return; }
+      if (authSess?.user && !registering.current && !recovering.current) {
         await loadProfile(authSess.user.id);
-      } else if (!authSess?.user) {
+      } else if (!authSess?.user && !recovering.current) {
         setSession(null);
         setView("login");
       }
