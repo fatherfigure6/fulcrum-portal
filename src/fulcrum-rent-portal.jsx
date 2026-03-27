@@ -280,6 +280,7 @@ const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
 export default function App() {
   const initSession = (() => { try { const s = localStorage.getItem("fa:session"); return s ? JSON.parse(s) : null; } catch { return null; } })();
   const initView = (() => {
+    if (initSession?.mustChangePassword) return "change-password";
     if (initSession) return "dashboard";
     const p = new URLSearchParams(window.location.search);
     if (p.get("view") === "reset" && p.get("email") && p.get("token")) return "reset";
@@ -314,8 +315,13 @@ export default function App() {
     const u = users.find(x => x.email.toLowerCase() === email.toLowerCase() && x.password === password);
     if (!u) return "Invalid email or password.";
     if (u.role === "broker" && u.status !== "approved") return "Your account is pending approval.";
-    localStorage.setItem("fa:session", JSON.stringify(u));
-    setSession(u); setView("dashboard"); setPage("dashboard"); return null;
+    const { password: _pw, ...safeUser } = u; // never store raw password in localStorage
+    if (u.mustChangePassword) {
+      localStorage.setItem("fa:session", JSON.stringify(safeUser));
+      setSession(safeUser); setView("change-password"); return null;
+    }
+    localStorage.setItem("fa:session", JSON.stringify(safeUser));
+    setSession(safeUser); setView("dashboard"); setPage("dashboard"); return null;
   };
   const logout = () => { localStorage.removeItem("fa:session"); setSession(null); setView("login"); };
 
@@ -360,6 +366,30 @@ export default function App() {
 
   const approveUser   = async id => saveUsers(users.map(u => u.id === id ? { ...u, status: "approved" } : u));
   const rejectUser    = async id => saveUsers(users.filter(u => u.id !== id));
+  const addBroker = async data => {
+    if (!data.tempPassword || data.tempPassword.length < 8) return "Temporary password must be at least 8 characters.";
+    if (users.find(x => x.email.toLowerCase() === data.email.trim().toLowerCase())) return "Email already registered.";
+    await saveUsers([...users, {
+      id: uid(), name: data.name.trim(), email: data.email.trim().toLowerCase(),
+      company: data.company.trim(), phone: data.phone?.trim() || "",
+      password: data.tempPassword, role: "broker", status: "approved",
+      mustChangePassword: true, resetToken: null, resetTokenExpiresAt: null
+    }]);
+    return null;
+  };
+  const changePassword = async newPassword => {
+    if (!session?.id) return "Session expired. Please log in again.";
+    if (newPassword.length < 8) return "Password must be at least 8 characters.";
+    const currentUser = users.find(u => u.id === session.id);
+    if (!currentUser) return "User not found. Please log in again.";
+    if (newPassword === currentUser.password) return "New password must be different from the temporary password.";
+    // TODO: migrate password storage to hashed passwords
+    await saveUsers(users.map(u => u.id === session.id ? { ...u, password: newPassword, mustChangePassword: false } : u));
+    const { password: _pw, ...safeSession } = { ...session, mustChangePassword: false };
+    localStorage.setItem("fa:session", JSON.stringify(safeSession));
+    setSession(safeSession); setView("dashboard"); setPage("dashboard");
+    return null;
+  };
   const submitRequest = async data => {
     const req = { ...data, id: uid(), brokerId: session.id, brokerName: session.name, brokerEmail: session.email, brokerCompany: session.company, status: "pending", createdAt: Date.now(), completedAt: null, downloadUrl: null };
     await saveRequests([req, ...requests]);
@@ -390,14 +420,15 @@ export default function App() {
           <button className="btn btn-secondary btn-sm" onClick={() => setShowInstall(false)}>✕</button>
         </div>
       )}
-      {view==="login"    && <LoginScreen onLogin={login} onRegister={() => setView("register")} onForgotPassword={() => setView("forgot")} />}
-      {view==="register" && <RegisterScreen onRegister={register} onBack={() => setView("login")} />}
-      {view==="forgot"   && <ForgotPasswordScreen onForgotPassword={forgotPassword} onBack={() => setView("login")} />}
-      {view==="reset"    && <ResetPasswordScreen  onResetPassword={resetPassword}   onBack={() => setView("login")} />}
+      {view==="login"           && <LoginScreen onLogin={login} onRegister={() => setView("register")} onForgotPassword={() => setView("forgot")} />}
+      {view==="register"        && <RegisterScreen onRegister={register} onBack={() => setView("login")} />}
+      {view==="forgot"          && <ForgotPasswordScreen onForgotPassword={forgotPassword} onBack={() => setView("login")} />}
+      {view==="reset"           && <ResetPasswordScreen  onResetPassword={resetPassword}   onBack={() => setView("login")} />}
+      {view==="change-password" && session && <ChangePasswordScreen onChangePassword={changePassword} />}
       {view==="dashboard" && session && (
-        <AppShell session={session} page={page} setPage={setPage} onLogout={logout}
+        <AppShell session={session} setView={setView} page={page} setPage={setPage} onLogout={logout}
           users={users} requests={requests} onApprove={approveUser} onReject={rejectUser}
-          onSubmitRequest={submitRequest} onUpdateRequest={updateRequest} />
+          onAddBroker={addBroker} onSubmitRequest={submitRequest} onUpdateRequest={updateRequest} />
       )}
     </>
   );
@@ -590,8 +621,44 @@ function ResetPasswordScreen({ onResetPassword, onBack }) {
   );
 }
 
+// ── Change Password (forced on first login) ───────────────────────────────────
+function ChangePasswordScreen({ onChangePassword }) {
+  const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
+  const [err,      setErr]      = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const submit = async () => {
+    if (password.length < 8) return setErr("Password must be at least 8 characters.");
+    if (password !== confirm)  return setErr("Passwords do not match.");
+    setErr(""); setLoading(true);
+    const result = await onChangePassword(password);
+    setLoading(false);
+    if (result) setErr(result);
+  };
+  return (
+    <div className="auth-shell">
+      <div className="auth-panel">
+        <div className="auth-brand"><img src="/Full Logo Light BG, Dark Text.png" style={{maxWidth:180,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
+        <div className="auth-title">Set Your Password</div>
+        <p style={{fontSize:14,color:"#888",marginBottom:16}}>You've been given a temporary password. Please set a new password before continuing.</p>
+        {err && <div className="alert alert-error">{err}</div>}
+        <div className="field"><label>New Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
+        <div className="field"><label>Confirm Password</label><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
+        <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Saving…" : "Set Password & Continue →"}</button>
+      </div>
+      <div className="auth-deco">
+        <div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div>
+      </div>
+    </div>
+  );
+}
+
 // ── App Shell ─────────────────────────────────────────────────────────────────
-function AppShell({ session, page, setPage, onLogout, users, requests, onApprove, onReject, onSubmitRequest, onUpdateRequest }) {
+function AppShell({ session, setView, page, setPage, onLogout, users, requests, onApprove, onReject, onAddBroker, onSubmitRequest, onUpdateRequest }) {
+  useEffect(() => {
+    if (session?.mustChangePassword) setView("change-password");
+  }, [session]);
+  if (session?.mustChangePassword) return null;
   const isStaff  = session.role === "staff";
   const isBroker = session.role === "broker";
   const pendingApprovals = users.filter(u => u.role==="broker" && u.status==="pending").length;
@@ -657,7 +724,7 @@ function AppShell({ session, page, setPage, onLogout, users, requests, onApprove
           {page==="cma-requests"  && <AdminRequests  requests={requests.filter(r=>r.type==="cma")}  onUpdate={onUpdateRequest} type="cma"  />}
           {page==="pdr-requests"  && <AdminPDRRequests requests={requests.filter(r=>r.type==="pdr")} onUpdate={onUpdateRequest} />}
           {page==="referrals"     && <AdminReferrals  requests={requests.filter(r=>r.type==="referral")} onUpdate={onUpdateRequest} />}
-          {page==="brokers"       && <AdminBrokers   users={users} onApprove={onApprove} onReject={onReject} />}
+          {page==="brokers"       && <AdminBrokers   users={users} onApprove={onApprove} onReject={onReject} onAddBroker={onAddBroker} />}
         </>}
         {isBroker && <>
           {page==="dashboard" && <BrokerDashboard session={session} requests={requests.filter(r=>r.brokerId===session.id)} setPage={setPage} />}
@@ -828,13 +895,53 @@ function AdminRequests({ requests, onUpdate, type }) {
 }
 
 // ── Admin Brokers ─────────────────────────────────────────────────────────────
-function AdminBrokers({ users, onApprove, onReject }) {
+function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
   const brokers  = users.filter(u=>u.role==="broker");
   const pending  = brokers.filter(b=>b.status==="pending");
   const approved = brokers.filter(b=>b.status==="approved");
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ name:"", email:"", company:"", phone:"", tempPassword:"" });
+  const [err,  setErr]  = useState("");
+  const [done, setDone] = useState(false);
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const submitAdd = async () => {
+    if (!form.name || !form.email || !form.company || !form.tempPassword) return setErr("Please fill all required fields.");
+    const e = await onAddBroker(form);
+    if (e) { setErr(e); }
+    else {
+      setDone(true); setForm({ name:"", email:"", company:"", phone:"", tempPassword:"" }); setErr("");
+      setTimeout(() => { setDone(false); setShowForm(false); }, 2500);
+    }
+  };
   return (
     <>
-      <div className="page-header"><div className="page-title">Broker Management</div><div className="page-sub">Approve, manage and review broker accounts</div></div>
+      <div className="page-header" style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+        <div><div className="page-title">Broker Management</div><div className="page-sub">Approve, manage and review broker accounts</div></div>
+        <button className="btn btn-primary btn-sm" onClick={() => { setShowForm(s=>!s); setErr(""); setDone(false); }}>+ Add Broker</button>
+      </div>
+      {showForm && (
+        <div className="card" style={{marginBottom:20}}>
+          <div className="card-title">Add Broker Account</div>
+          {done && <div className="alert alert-success" style={{marginBottom:12}}>✅ Broker added. They will be prompted to set a new password on first sign in.</div>}
+          {err  && <div className="alert alert-error"   style={{marginBottom:12}}>{err}</div>}
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+            <div className="field"><label>Full Name *</label><input value={form.name} onChange={set("name")} /></div>
+            <div className="field"><label>Company *</label><input value={form.company} onChange={set("company")} /></div>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+            <div className="field"><label>Email *</label><input value={form.email} onChange={set("email")} /></div>
+            <div className="field"><label>Phone</label><input value={form.phone} onChange={set("phone")} /></div>
+          </div>
+          <div className="field" style={{maxWidth:300}}>
+            <label>Temporary Password * <span style={{fontSize:11,color:"#aaa",fontWeight:400}}>(min 8 characters)</span></label>
+            <input type="text" value={form.tempPassword} onChange={set("tempPassword")} placeholder="e.g. Fulcrum2024!" />
+          </div>
+          <div style={{display:"flex",gap:8,marginTop:4}}>
+            <button className="btn btn-primary btn-sm" onClick={submitAdd}>Add Broker</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setShowForm(false); setErr(""); }}>Cancel</button>
+          </div>
+        </div>
+      )}
       {pending.length>0 && (
         <div className="card" style={{marginBottom:20}}>
           <div className="card-title">⏳ Pending Approval ({pending.length})</div>
@@ -862,7 +969,11 @@ function AdminBrokers({ users, onApprove, onReject }) {
           <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th></tr></thead>
           <tbody>
             {approved.map(b=>(
-              <tr key={b.id}><td><strong>{b.name}</strong></td><td>{b.company}</td><td style={{fontSize:13}}>{b.email}</td><td><StatusBadge s="approved" /></td></tr>
+              <tr key={b.id}>
+                <td><strong>{b.name}</strong></td><td>{b.company}</td>
+                <td style={{fontSize:13}}>{b.email}</td>
+                <td>{b.mustChangePassword ? <span className="badge badge-pending">Temp password</span> : <StatusBadge s="approved" />}</td>
+              </tr>
             ))}
             {approved.length===0 && <tr><td colSpan={4}><div className="empty">No approved brokers yet</div></td></tr>}
           </tbody>
