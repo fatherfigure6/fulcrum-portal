@@ -339,7 +339,7 @@ export default function App() {
       const baseUrl = window.location.origin.includes("localhost") ? "http://localhost:3000" : window.location.origin;
       const resetLink = `${baseUrl}?view=reset&email=${encodeURIComponent(normalised)}&token=${encodeURIComponent(token)}`;
       const sent = await sendEmail("template_w5i9cdv", {
-        to_email: normalised, user_name: user.name || "", reset_link: resetLink, expiry_time: "1 hour"
+        email: normalised, user_name: user.name || "", reset_link: resetLink, expiry_time: "1 hour"
       });
       if (!sent) return "We couldn't send the reset email right now. Please try again.";
       await saveUsers(users.map(u => u.id === user.id ? { ...u, resetToken: token, resetTokenExpiresAt: Date.now() + 3600000 } : u));
