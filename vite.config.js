@@ -6,6 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      selfDestroying: true,
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
