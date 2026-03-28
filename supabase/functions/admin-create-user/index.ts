@@ -18,21 +18,10 @@ Deno.serve(async (req) => {
 
   // ── Read and validate Authorization header ──────────────────────────────────
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return json({ error: "Unauthorized" }, 401);
-
+  if (!authHeader?.startsWith("Bearer ")) {
+    return json({ error: "Unauthorized" }, 401);
+  }
   const token = authHeader.replace("Bearer ", "");
-
-  // ── Validate token with user-scoped client (anon key + explicit token) ──────
-  const authClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  const { data: userData, error: authError } = await authClient.auth.getUser(token);
-  if (authError || !userData?.user) return json({ error: "Unauthorized" }, 401);
-
-  const userId = userData.user.id;
 
   // ── Admin client for privileged operations ──────────────────────────────────
   const adminClient = createClient(
@@ -40,6 +29,14 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
+
+  // ── Validate caller token ───────────────────────────────────────────────────
+  const { data: userData, error: authError } = await adminClient.auth.getUser(token);
+  if (authError || !userData?.user) {
+    console.error("[auth] getUser failed:", authError);
+    return json({ error: "Unauthorized" }, 401);
+  }
+  const userId = userData.user.id;
 
   // ── Verify caller is staff ─────────────────────────────────────────────────
   const { data: callerProfile } = await adminClient
