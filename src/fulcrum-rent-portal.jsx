@@ -383,14 +383,14 @@ export default function App() {
 
     initAuth();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       console.log("[onAuthStateChange] event:", event, "session:", session);
       if (event === "PASSWORD_RECOVERY") { recovering.current = true; setView("reset"); return; }
       if (event === "USER_UPDATED") { recovering.current = false; return; }
       if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setView("login"); return; }
       if (registering.current) return;
-      await resolveAuth(session);
+      void resolveAuth(session);
     });
 
     (async () => {
