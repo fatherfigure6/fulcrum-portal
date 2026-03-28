@@ -491,8 +491,16 @@ export default function App() {
   };
 
   const rejectUser = async id => {
-    const { data } = await supabase.functions.invoke("admin-delete-user", { body: { userId: id } });
-    if (data?.error) return;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return "Not authenticated.";
+    const { data, error: invokeError } = await supabase.functions.invoke("admin-delete-user", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: { userId: id },
+    });
+    if (invokeError || data?.error) {
+      console.error("[admin-delete-user] invoke failed:", invokeError || data?.error);
+      return invokeError?.message || data?.error || "Request failed.";
+    }
     setUsers(users.filter(u => u.id !== id));
   };
 
@@ -504,10 +512,20 @@ export default function App() {
     if (!email) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
     if (!password || password.length < 8) return "Temporary password must be at least 8 characters.";
-    const { data: result } = await supabase.functions.invoke("admin-create-user", {
-      body: { email, password, name, role: "staff", mustChangePassword: true }
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return "Not authenticated.";
+    const { data: result, error: invokeError } = await supabase.functions.invoke("admin-create-user", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: { email, password, name, role: "staff", mustChangePassword: true },
     });
-    if (result?.error) return result.error;
+    if (invokeError || result?.error) {
+      console.error("[admin-create-user] invoke failed:", invokeError || result?.error);
+      return invokeError?.message || result?.error || "Request failed.";
+    }
+    if (!result?.id) {
+      console.error("[admin-create-user] missing result.id:", result);
+      return "Request failed.";
+    }
     setUsers([...users, { id: result.id, name, email, role: "staff", status: null, company: "", phone: "", mustChangePassword: true }]);
     return null;
   };
@@ -518,15 +536,26 @@ export default function App() {
     if (!target || target.role !== "staff") return "Staff account not found.";
     const remainingStaff = users.filter(u => u.role === "staff" && u.id !== id);
     if (remainingStaff.length === 0) return "Cannot remove the last staff account.";
-    const { data } = await supabase.functions.invoke("admin-delete-user", { body: { userId: id } });
-    if (data?.error) return data.error;
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return "Not authenticated.";
+    const { data, error: invokeError } = await supabase.functions.invoke("admin-delete-user", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: { userId: id },
+    });
+    if (invokeError || data?.error) {
+      console.error("[admin-delete-user] invoke failed:", invokeError || data?.error);
+      return invokeError?.message || data?.error || "Request failed.";
+    }
     setUsers(users.filter(u => u.id !== id));
     return null;
   };
 
   const addBroker = async data => {
     if (!data.tempPassword || data.tempPassword.length < 8) return "Temporary password must be at least 8 characters.";
-    const { data: result } = await supabase.functions.invoke("admin-create-user", {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return "Not authenticated.";
+    const { data: result, error: invokeError } = await supabase.functions.invoke("admin-create-user", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
       body: {
         email: data.email.trim().toLowerCase(),
         password: data.tempPassword,
@@ -535,9 +564,16 @@ export default function App() {
         company: data.company.trim(),
         phone: data.phone?.trim() || null,
         mustChangePassword: true,
-      }
+      },
     });
-    if (result?.error) return result.error;
+    if (invokeError || result?.error) {
+      console.error("[admin-create-user] invoke failed:", invokeError || result?.error);
+      return invokeError?.message || result?.error || "Request failed.";
+    }
+    if (!result?.id) {
+      console.error("[admin-create-user] missing result.id:", result);
+      return "Request failed.";
+    }
     setUsers([...users, {
       id: result.id, name: data.name.trim(), email: data.email.trim().toLowerCase(),
       company: data.company.trim(), phone: data.phone?.trim() || "",
