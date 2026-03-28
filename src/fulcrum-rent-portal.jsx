@@ -311,14 +311,23 @@ export default function App() {
       if (data.role === "broker" && data.status !== "approved") {
         console.warn("[loadProfile] broker not approved, signing out");
         await supabase.auth.signOut();
+        setSession(null);
         setView("login");
         return;
       }
       const profile = normalizeProfile(data);
       setSession(profile);
-      if (profile.mustChangePassword) setView("change-password");
-      else { setView("dashboard"); setPage("dashboard"); }
-      if (profile.role === "staff") await loadUsers();
+      if (profile.mustChangePassword) {
+        setView("change-password");
+      } else {
+        setView("dashboard");
+        setPage("dashboard");
+      }
+      if (profile.role === "staff") {
+        loadUsers().catch(err => {
+          console.error("[loadUsers] failed:", err);
+        });
+      }
     } catch (err) {
       console.error("[loadProfile] error:", err);
       setView("login");
@@ -397,14 +406,17 @@ export default function App() {
   const saveRequests = async r => { setRequests(r); await store.set("fa:requests", r); };
 
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
-    if (error) return "Invalid email or password.";
-    const { data: profile } = await supabase.from("profiles").select("role,status").eq("id", data.user.id).single();
-    if (profile?.role === "broker" && profile?.status !== "approved") {
-      await supabase.auth.signOut();
-      return "Your account is pending approval.";
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (error) return "Invalid email or password.";
+      return null;
+    } catch (err) {
+      console.error("login failed:", err);
+      return "An error occurred. Please try again.";
     }
-    return null;
   };
 
   const logout = async () => { await supabase.auth.signOut(); };
@@ -585,7 +597,19 @@ function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
   const [pass,  setPass]  = useState("");
   const [err,   setErr]   = useState("");
   const [loading, setLoading] = useState(false);
-  const submit = async () => { setErr(""); setLoading(true); const e = await onLogin(email, pass); setLoading(false); if (e) setErr(e); };
+  const submit = async () => {
+    setErr("");
+    setLoading(true);
+    try {
+      const e = await onLogin(email, pass);
+      if (e) setErr(e);
+    } catch (err) {
+      console.error("submit failed:", err);
+      setErr("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="auth-shell">
       <div className="auth-panel">
