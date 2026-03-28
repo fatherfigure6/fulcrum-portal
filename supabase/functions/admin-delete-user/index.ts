@@ -16,35 +16,46 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 
-  // ── Verify caller is authenticated ─────────────────────────────────────────
+  // ── Read and validate Authorization header ──────────────────────────────────
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
-  const jwt = authHeader.replace("Bearer ", "");
+  if (!authHeader) return json({ error: "Unauthorized" }, 401);
 
+  const token = authHeader.replace("Bearer ", "");
+
+  // ── Validate token with user-scoped client (anon key + explicit token) ──────
+  const authClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
+  );
+
+  const { data: userData, error: authError } = await authClient.auth.getUser(token);
+  if (authError || !userData?.user) return json({ error: "Unauthorized" }, 401);
+
+  const userId = userData.user.id;
+
+  // ── Admin client for privileged operations ──────────────────────────────────
   const adminClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     { auth: { autoRefreshToken: false, persistSession: false } }
   );
 
-  const { data: { user }, error: authError } = await adminClient.auth.getUser(jwt);
-  if (authError || !user) return json({ error: "Unauthorized" }, 401);
-
   // ── Verify caller is staff ─────────────────────────────────────────────────
   const { data: callerProfile } = await adminClient
     .from("profiles")
     .select("role")
-    .eq("id", user.id)
+    .eq("id", userId)
     .single();
 
   if (callerProfile?.role !== "staff") return json({ error: "Forbidden" }, 403);
 
   // ── Parse request body ─────────────────────────────────────────────────────
-  const { userId } = await req.json();
-  if (!userId) return json({ error: "userId is required" }, 400);
+  const { userId: targetUserId } = await req.json();
+  if (!targetUserId) return json({ error: "userId is required" }, 400);
 
   // ── Delete auth user (profile is deleted via ON DELETE CASCADE) ────────────
-  const { error } = await adminClient.auth.admin.deleteUser(userId);
+  const { error } = await adminClient.auth.admin.deleteUser(targetUserId);
   if (error) return json({ error: error.message });
 
   return json({ success: true });
