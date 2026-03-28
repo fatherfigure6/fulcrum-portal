@@ -299,44 +299,99 @@ export default function App() {
   };
 
   const loadProfile = async userId => {
-    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-    if (!data) { await supabase.auth.signOut(); return; }
-    if (data.role === "broker" && data.status !== "approved") {
-      await supabase.auth.signOut();
-      return;
+    try {
+      console.log("[loadProfile] loading userId:", userId);
+      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+      if (!data) {
+        console.warn("[loadProfile] no profile found, signing out");
+        await supabase.auth.signOut();
+        setView("login");
+        return;
+      }
+      if (data.role === "broker" && data.status !== "approved") {
+        console.warn("[loadProfile] broker not approved, signing out");
+        await supabase.auth.signOut();
+        setView("login");
+        return;
+      }
+      const profile = normalizeProfile(data);
+      setSession(profile);
+      if (profile.mustChangePassword) setView("change-password");
+      else { setView("dashboard"); setPage("dashboard"); }
+      if (profile.role === "staff") await loadUsers();
+    } catch (err) {
+      console.error("[loadProfile] error:", err);
+      setView("login");
     }
-    const profile = normalizeProfile(data);
-    setSession(profile);
-    if (profile.mustChangePassword) setView("change-password");
-    else { setView("dashboard"); setPage("dashboard"); }
-    if (profile.role === "staff") await loadUsers();
+  };
+
+  const resolveAuth = async (session) => {
+    try {
+      console.log("[resolveAuth] session:", session, "recovering:", recovering.current);
+      if (session?.user && !recovering.current) {
+        const { data: userData, error } = await supabase.auth.getUser();
+        if (error || !userData?.user) {
+          console.warn("[resolveAuth] getUser failed or no user:", error);
+          setView(v => v === "loading" ? "login" : v);
+          return;
+        }
+        await loadProfile(userData.user.id);
+      } else {
+        setView(v => v === "loading" ? "login" : v);
+      }
+    } catch (err) {
+      console.error("[resolveAuth] error:", err);
+      setView("login");
+    }
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, authSess) => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        console.log("[initAuth] getSession result:", data);
+        if (!mounted) return;
+        await resolveAuth(data.session);
+      } catch (err) {
+        console.error("[initAuth] getSession error:", err);
+        if (mounted) setView("login");
+      }
+    };
+
+    initAuth();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      console.log("[onAuthStateChange] event:", event, "session:", session);
       if (event === "PASSWORD_RECOVERY") { recovering.current = true; setView("reset"); return; }
       if (event === "USER_UPDATED") { recovering.current = false; return; }
       if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setView("login"); return; }
-      if (authSess?.user && !registering.current && !recovering.current) {
-        await loadProfile(authSess.user.id);
-      } else if (!authSess?.user && !recovering.current) {
-        setSession(null);
-        setView("login");
-      }
+      if (registering.current) return;
+      await resolveAuth(session);
     });
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      if (s?.user && !recovering.current) loadProfile(s.user.id);
-      else if (!s) setView(v => v === "loading" ? "login" : v);
-    });
     (async () => {
       let r = await store.get("fa:requests");
       if (r === null) { r = []; await store.set("fa:requests", r); }
       else if (!r) r = [];
-      setRequests(r);
+      if (mounted) setRequests(r);
     })();
+
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      listener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setView(v => v === "loading" ? "login" : v);
+    }, 3000);
+    return () => clearTimeout(timeout);
   }, []);
 
   const saveRequests = async r => { setRequests(r); await store.set("fa:requests", r); };
