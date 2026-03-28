@@ -279,8 +279,9 @@ export default function App() {
   const [page,     setPage]     = useState("dashboard");
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
-  const registering = useRef(false);
-  const recovering  = useRef(false);
+  const registering      = useRef(false);
+  const recovering       = useRef(false);
+  const profileLoadRef   = useRef({ userId: null, promise: null });
 
   const normalizeProfile = row => ({
     id: row.id,
@@ -298,55 +299,66 @@ export default function App() {
     setUsers((data || []).map(normalizeProfile));
   };
 
-  const loadProfile = async userId => {
-    try {
-      console.log("[loadProfile] loading userId:", userId);
-      const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
-      if (!data) {
-        console.warn("[loadProfile] no profile found, signing out");
-        await supabase.auth.signOut();
-        setView("login");
-        return;
-      }
-      if (data.role === "broker" && data.status !== "approved") {
-        console.warn("[loadProfile] broker not approved, signing out");
-        await supabase.auth.signOut();
+  const loadProfile = (userId) => {
+    if (profileLoadRef.current.promise && profileLoadRef.current.userId === userId) {
+      console.log("[loadProfile] deduped — already loading for", userId);
+      return profileLoadRef.current.promise;
+    }
+
+    const run = (async () => {
+      try {
+        console.log("[loadProfile] starting for", userId);
+        const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
+        if (!data) {
+          console.warn("[loadProfile] no profile found, signing out");
+          await supabase.auth.signOut();
+          setSession(null);
+          setView("login");
+          return;
+        }
+        if (data.role === "broker" && data.status !== "approved") {
+          console.warn("[loadProfile] broker not approved, signing out");
+          await supabase.auth.signOut();
+          setSession(null);
+          setPage("dashboard");
+          setView("login");
+          return;
+        }
+        const profile = normalizeProfile(data);
+        setSession(profile);
+        if (profile.mustChangePassword) {
+          setView("change-password");
+        } else {
+          setView("dashboard");
+          setPage("dashboard");
+        }
+        if (profile.role === "staff") {
+          loadUsers().catch(err => {
+            console.error("[loadUsers] failed:", err);
+          });
+        }
+      } catch (err) {
+        console.error("[loadProfile] failed:", err);
         setSession(null);
         setView("login");
-        return;
+      } finally {
+        if (profileLoadRef.current.userId === userId) {
+          profileLoadRef.current = { userId: null, promise: null };
+        }
       }
-      const profile = normalizeProfile(data);
-      setSession(profile);
-      if (profile.mustChangePassword) {
-        setView("change-password");
-      } else {
-        setView("dashboard");
-        setPage("dashboard");
-      }
-      if (profile.role === "staff") {
-        loadUsers().catch(err => {
-          console.error("[loadUsers] failed:", err);
-        });
-      }
-    } catch (err) {
-      console.error("[loadProfile] error:", err);
-      setView("login");
-    }
+    })();
+
+    profileLoadRef.current = { userId, promise: run };
+    return run;
   };
 
   const resolveAuth = async (session) => {
     try {
       console.log("[resolveAuth] session:", session, "recovering:", recovering.current);
       if (session?.user && !recovering.current) {
-        const { data: userData, error } = await supabase.auth.getUser();
-        if (error || !userData?.user) {
-          console.warn("[resolveAuth] getUser failed or no user:", error);
-          setView(v => v === "loading" ? "login" : v);
-          return;
-        }
-        await loadProfile(userData.user.id);
+        await loadProfile(session.user.id);
       } else {
-        setView(v => v === "loading" ? "login" : v);
+        setView(v => (v === "loading" ? "login" : v));
       }
     } catch (err) {
       console.error("[resolveAuth] error:", err);
