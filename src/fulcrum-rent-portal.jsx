@@ -79,6 +79,12 @@ const CSS = `
   .tbl td { padding:10px 14px; border-bottom:1px solid var(--border); vertical-align:middle; font-feature-settings:'tnum'; }
   .tbl tr:last-child td { border-bottom:none; }
   .tbl tr:hover td { background:var(--grey-100); }
+  .req-table-wrap { display:block; }
+  .req-cards { display:none; flex-direction:column; gap:10px; }
+  .req-card { border:1px solid var(--border); border-radius:var(--r); padding:14px 16px; background:var(--white); box-shadow:var(--shadow-1); display:flex; flex-direction:column; gap:8px; }
+  .req-card-address { font-size:15px; font-weight:500; overflow-wrap:anywhere; }
+  .req-card-date { font-size:12px; color:#888; }
+  .req-card-doc { margin-top:2px; }
   .badge { display:inline-block; padding:2px 8px; border-radius:2px; font-size:11px; font-weight:600; letter-spacing:.3px; text-transform:uppercase; }
   .badge-pending  { background:#f5e8e8; color:#8b2020; }
   .badge-complete { background:#e4ede8; color:#2a5c3a; }
@@ -185,6 +191,8 @@ const CSS = `
     .page-title { font-size:20px; }
     .page-header { margin-bottom:18px; }
     .card { padding:14px 14px; overflow-x:auto; }
+    .req-table-wrap { display:none; }
+    .req-cards { display:flex; }
     .tbl { min-width:480px; }
     .modal { padding:20px 16px; max-height:88vh; width:100%; }
     .row-between { flex-wrap:wrap; gap:8px; }
@@ -1149,21 +1157,35 @@ function AdminDashboard({ requests, users }) {
             <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/cma-requests")}>CMAs →</button>
           </div>
         </div>
-        <table className="tbl" style={{marginTop:16}}>
-          <thead><tr><th>Type</th><th>Broker</th><th>Property</th><th>Date</th><th>Status</th></tr></thead>
-          <tbody>
-            {requests.slice(0,6).map(r=>(
-              <tr key={r.id}>
-                <td><TypeBadge t={r.type} /></td>
-                <td><strong>{r.brokerName}</strong><br/><span style={{fontSize:12,color:"#aaa"}}>{r.brokerCompany}</span></td>
-                <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
-                <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
-                <td><StatusBadge s={r.status} /></td>
-              </tr>
-            ))}
-            {requests.length===0 && <tr><td colSpan={5}><div className="empty">No requests yet</div></td></tr>}
-          </tbody>
-        </table>
+        <div className="req-table-wrap">
+          <table className="tbl" style={{marginTop:16}}>
+            <thead><tr><th>Type</th><th>Broker</th><th>Property</th><th>Date</th><th>Status</th></tr></thead>
+            <tbody>
+              {requests.slice(0,6).map(r=>(
+                <tr key={r.id}>
+                  <td><TypeBadge t={r.type} /></td>
+                  <td><strong>{r.brokerName}</strong><br/><span style={{fontSize:12,color:"#aaa"}}>{r.brokerCompany}</span></td>
+                  <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
+                  <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
+                  <td><StatusBadge s={r.status} /></td>
+                </tr>
+              ))}
+              {requests.length===0 && <tr><td colSpan={5}><div className="empty">No requests yet</div></td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="req-cards" style={{marginTop:16}}>
+          {requests.slice(0,6).length ? requests.slice(0,6).map(r=>(
+            <div key={r.id} className="req-card">
+              <TypeBadge t={r.type} />
+              <div className="req-card-address">{r.address || "—"}</div>
+              <div className="req-card-date">{fmt(r.createdAt)}</div>
+              <StatusBadge s={r.status} />
+            </div>
+          )) : (
+            <div style={{fontSize:14,color:"#aaa"}}>No requests yet</div>
+          )}
+        </div>
       </div>
     </>
   );
@@ -1549,20 +1571,39 @@ function BrokerDashboard({ session, requests }) {
       {recent.length>0 ? (
         <div className="card">
           <div className="card-title">Recent Requests</div>
-          <table className="tbl">
-            <thead><tr><th>Type</th><th>Property</th><th>Date</th><th>Status</th><th></th></tr></thead>
-            <tbody>
-              {recent.map(r=>(
-                <tr key={r.id}>
-                  <td><TypeBadge t={r.type} /></td>
-                  <td style={{fontSize:13}}>{r.address}</td>
-                  <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
-                  <td><StatusBadge s={r.status} /></td>
-                  <td>{r.status==="complete"&&r.downloadUrl&&<a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️</a>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="req-table-wrap">
+            <table className="tbl">
+              <thead><tr><th>Type</th><th>Property</th><th>Date</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {recent.map(r=>(
+                  <tr key={r.id}>
+                    <td><TypeBadge t={r.type} /></td>
+                    <td style={{fontSize:13}}>{r.address}</td>
+                    <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
+                    <td><StatusBadge s={r.status} /></td>
+                    <td>{r.status==="complete"&&r.downloadUrl&&<a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️</a>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="req-cards">
+            {recent.length ? recent.map(r=>(
+              <div key={r.id} className="req-card">
+                <TypeBadge t={r.type} />
+                <div className="req-card-address">{r.address || "—"}</div>
+                <div className="req-card-date">{fmt(r.createdAt)}</div>
+                <StatusBadge s={r.status} />
+                {r.status==="complete" && r.downloadUrl && (
+                  <div className="req-card-doc">
+                    <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️ Download</a>
+                  </div>
+                )}
+              </div>
+            )) : (
+              <div style={{fontSize:14,color:"#aaa"}}>No requests yet</div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="card" style={{textAlign:"center",padding:"60px 20px"}}>
@@ -1810,25 +1851,44 @@ function BrokerRequests({ requests }) {
             ))}
           </div>
         </div>
-        <table className="tbl">
-          <thead><tr><th>Type</th><th>Property</th><th>Details</th><th>Submitted</th><th>Status</th><th>Document</th></tr></thead>
-          <tbody>
-            {filtered.map(r=>(
-              <tr key={r.id}>
-                <td><TypeBadge t={r.type} /></td>
-                <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
-                <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":r.type==="referral"?r.clientName||"Client":fmtMoney(r.expectedValue)}</span></td>
-                <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
-                <td><StatusBadge s={r.status} /></td>
-                <td>{r.status==="complete"&&r.downloadUrl
-                  ? <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️</a>
-                  : <span style={{fontSize:12,color:"#bbb"}}>Pending</span>}
-                </td>
-              </tr>
-            ))}
-            {filtered.length===0 && <tr><td colSpan={6}><div className="empty"><div className="empty-icon">📭</div>No requests found</div></td></tr>}
-          </tbody>
-        </table>
+        <div className="req-table-wrap">
+          <table className="tbl">
+            <thead><tr><th>Type</th><th>Property</th><th>Details</th><th>Submitted</th><th>Status</th><th>Document</th></tr></thead>
+            <tbody>
+              {filtered.map(r=>(
+                <tr key={r.id}>
+                  <td><TypeBadge t={r.type} /></td>
+                  <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
+                  <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":r.type==="referral"?r.clientName||"Client":fmtMoney(r.expectedValue)}</span></td>
+                  <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
+                  <td><StatusBadge s={r.status} /></td>
+                  <td>{r.status==="complete"&&r.downloadUrl
+                    ? <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️</a>
+                    : <span style={{fontSize:12,color:"#bbb"}}>Pending</span>}
+                  </td>
+                </tr>
+              ))}
+              {filtered.length===0 && <tr><td colSpan={6}><div className="empty"><div className="empty-icon">📭</div>No requests found</div></td></tr>}
+            </tbody>
+          </table>
+        </div>
+        <div className="req-cards">
+          {filtered.length ? filtered.map(r=>(
+            <div key={r.id} className="req-card">
+              <TypeBadge t={r.type} />
+              <div className="req-card-address">{r.address || "—"}</div>
+              <div className="req-card-date">{fmt(r.createdAt)}</div>
+              <StatusBadge s={r.status} />
+              {r.status==="complete" && r.downloadUrl && (
+                <div className="req-card-doc">
+                  <a href={r.downloadUrl} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm" style={{textDecoration:"none"}}>⬇️ Download</a>
+                </div>
+              )}
+            </div>
+          )) : (
+            <div className="empty"><div className="empty-icon">📭</div>No requests found</div>
+          )}
+        </div>
       </div>
     </>
   );
