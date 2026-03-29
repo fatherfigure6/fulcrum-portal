@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
 import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
+import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Outlet } from "react-router-dom";
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -161,6 +162,11 @@ const CSS = `
     .type-toggle { grid-template-columns:1fr; }
     .range-row { grid-template-columns:1fr; }
   }
+  .breadcrumbs { display:flex; align-items:center; gap:6px; font-size:12px; color:#999; margin-bottom:20px; flex-wrap:wrap; }
+  .bc-link { color:#888; cursor:pointer; }
+  .bc-link:hover { color:var(--primary); text-decoration:underline; }
+  .bc-sep { color:#ccc; }
+  .bc-current { color:var(--primary); font-weight:500; }
   @media(max-width:600px){
     .sidebar { display:none; }
     .mobile-header { display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:var(--primary); position:fixed; top:0; left:0; right:0; z-index:50; height:52px; border-bottom:1px solid rgba(255,255,255,.1); }
@@ -270,18 +276,124 @@ const uid      = () => Math.random().toString(36).slice(2, 10);
 const fmt      = d  => new Date(d).toLocaleDateString("en-AU", { day:"2-digit", month:"short", year:"numeric" });
 const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
 
+// ── Infrastructure ────────────────────────────────────────────────────────────
+const DRAFT_VERSION = 1;
+const AUTH_ONLY_PATHS = ["/login", "/register", "/forgot-password", "/reset-password", "/change-password"];
+
+const ROUTES = [
+  { path: "/dashboard",     label: "Dashboard",         crumbParent: null },
+  { path: "/rent-requests", label: "Rent Requests",     crumbParent: "/dashboard" },
+  { path: "/cma-requests",  label: "CMA Requests",      crumbParent: "/dashboard" },
+  { path: "/pdr-reports",   label: "PDR Reports",       crumbParent: "/dashboard" },
+  { path: "/referrals",     label: "Referrals",         crumbParent: "/dashboard" },
+  { path: "/brokers",       label: "Broker Management", crumbParent: "/dashboard" },
+  { path: "/staff",         label: "Staff Accounts",    crumbParent: "/dashboard" },
+  { path: "/requests",      label: "My Requests",       crumbParent: "/dashboard" },
+  { path: "/requests/new",  label: "New Request",       crumbParent: "/requests"  },
+];
+
+function buildCrumbs(pathname) {
+  const route = ROUTES.find(r => r.path === pathname);
+  if (!route || !route.crumbParent) return [];
+  const parent = ROUTES.find(r => r.path === route.crumbParent);
+  const chain = parent ? [{ label: parent.label, to: parent.path }] : [];
+  return [...chain, { label: route.label }];
+}
+
+function isDraftDirty(current, initial) {
+  try { return JSON.stringify(current) !== JSON.stringify(initial); }
+  catch { return false; }
+}
+
+function useDraft(key, initial) {
+  const [value, setValue] = useState(() => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return initial;
+      const parsed = JSON.parse(raw);
+      if (parsed?.version !== DRAFT_VERSION || !parsed?.data) return initial;
+      return parsed.data;
+    } catch { return initial; }
+  });
+
+  const set = useCallback(updater => {
+    setValue(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try {
+        localStorage.setItem(key, JSON.stringify({ version: DRAFT_VERSION, savedAt: Date.now(), data: next }));
+      } catch {}
+      return next;
+    });
+  }, [key]);
+
+  const clear = useCallback(() => {
+    localStorage.removeItem(key);
+    setValue(initial);
+  }, [key]);
+
+  return [value, set, clear];
+}
+
+function useUnsavedWarning(isDirty) {
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = e => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+}
+
+const DirtyCtx = createContext({ dirtyRef: { current: false } });
+
+function Breadcrumbs() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const crumbs = buildCrumbs(pathname);
+  if (crumbs.length === 0) return null;
+  return (
+    <div className="breadcrumbs">
+      {crumbs.map((c, i) => (
+        <span key={i} style={{display:"flex",alignItems:"center",gap:6}}>
+          {i > 0 && <span className="bc-sep">›</span>}
+          {c.to
+            ? <span className="bc-link" onClick={() => navigate(c.to)}>{c.label}</span>
+            : <span className="bc-current">{c.label}</span>
+          }
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function LoadingScreen() {
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
+}
+
+function ProtectedRoute({ session, isLoading, children }) {
+  const location = useLocation();
+  if (isLoading) return <LoadingScreen />;
+  if (!session) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (session.mustChangePassword && location.pathname !== "/change-password")
+    return <Navigate to="/change-password" replace />;
+  if (!session.mustChangePassword && location.pathname === "/change-password")
+    return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
   const [users,    setUsers]    = useState([]);
   const [requests, setRequests] = useState([]);
   const [session,  setSession]  = useState(null);
-  const [view,     setView]     = useState("loading");
-  const [page,     setPage]     = useState("dashboard");
+  const [isLoading, setIsLoading] = useState(true);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
-  const registering      = useRef(false);
-  const recovering       = useRef(false);
-  const profileLoadRef   = useRef({ userId: null, promise: null });
+  const registering    = useRef(false);
+  const recovering     = useRef(false);
+  const profileLoadRef = useRef({ userId: null, promise: null });
+  const isInitialLoad  = useRef(true);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const normalizeProfile = row => ({
     id: row.id,
@@ -313,24 +425,27 @@ export default function App() {
           console.warn("[loadProfile] no profile found, signing out");
           await supabase.auth.signOut();
           setSession(null);
-          setView("login");
+          setIsLoading(false);
+          navigate("/login", { replace: true });
           return;
         }
         if (data.role === "broker" && data.status !== "approved") {
           console.warn("[loadProfile] broker not approved, signing out");
           await supabase.auth.signOut();
           setSession(null);
-          setPage("dashboard");
-          setView("login");
+          setIsLoading(false);
+          navigate("/login", { replace: true });
           return;
         }
         const profile = normalizeProfile(data);
         setSession(profile);
+        setIsLoading(false);
         if (profile.mustChangePassword) {
-          setView("change-password");
-        } else {
-          setView("dashboard");
-          setPage("dashboard");
+          navigate("/change-password", { replace: true });
+        } else if (!isInitialLoad.current) {
+          const intendedPath = location.state?.from?.pathname;
+          const safe = intendedPath && !AUTH_ONLY_PATHS.includes(intendedPath) ? intendedPath : "/dashboard";
+          navigate(safe, { replace: true });
         }
         if (profile.role === "staff") {
           loadUsers().catch(err => {
@@ -340,7 +455,8 @@ export default function App() {
       } catch (err) {
         console.error("[loadProfile] failed:", err);
         setSession(null);
-        setView("login");
+        setIsLoading(false);
+        navigate("/login", { replace: true });
       } finally {
         if (profileLoadRef.current.userId === userId) {
           profileLoadRef.current = { userId: null, promise: null };
@@ -352,17 +468,17 @@ export default function App() {
     return run;
   };
 
-  const resolveAuth = async (session) => {
+  const resolveAuth = async (authSession) => {
     try {
-      console.log("[resolveAuth] session:", session, "recovering:", recovering.current);
-      if (session?.user && !recovering.current) {
-        await loadProfile(session.user.id);
+      console.log("[resolveAuth] session:", authSession, "recovering:", recovering.current);
+      if (authSession?.user && !recovering.current) {
+        await loadProfile(authSession.user.id);
       } else {
-        setView(v => (v === "loading" ? "login" : v));
+        setIsLoading(false);
       }
     } catch (err) {
       console.error("[resolveAuth] error:", err);
-      setView("login");
+      setIsLoading(false);
     }
   };
 
@@ -377,20 +493,22 @@ export default function App() {
         await resolveAuth(data.session);
       } catch (err) {
         console.error("[initAuth] getSession error:", err);
-        if (mounted) setView("login");
+        if (mounted) setIsLoading(false);
+      } finally {
+        isInitialLoad.current = false;
       }
     };
 
     initAuth();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, authSession) => {
       if (!mounted) return;
-      console.log("[onAuthStateChange] event:", event, "session:", session);
-      if (event === "PASSWORD_RECOVERY") { recovering.current = true; setView("reset"); return; }
+      console.log("[onAuthStateChange] event:", event, "session:", authSession);
+      if (event === "PASSWORD_RECOVERY") { recovering.current = true; navigate("/reset-password"); return; }
       if (event === "USER_UPDATED") { recovering.current = false; return; }
-      if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setView("login"); return; }
+      if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setIsLoading(false); navigate("/login"); return; }
       if (registering.current) return;
-      void resolveAuth(session);
+      void resolveAuth(authSession);
     });
 
     (async () => {
@@ -409,9 +527,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      setView(v => v === "loading" ? "login" : v);
-    }, 3000);
+    const timeout = setTimeout(() => { setIsLoading(v => v ? false : v); }, 3000);
     return () => clearTimeout(timeout);
   }, []);
 
@@ -473,7 +589,7 @@ export default function App() {
 
   const forgotPassword = async email => {
     await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     return "If that email exists, password reset instructions have been sent.";
   };
@@ -491,8 +607,8 @@ export default function App() {
   };
 
   const rejectUser = async id => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return "Not authenticated.";
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession?.access_token) return "Not authenticated.";
     const { data, error: invokeError } = await supabase.functions.invoke("admin-delete-user", {
       headers: { Authorization: `Bearer ${session.access_token}` },
       body: { userId: id },
@@ -512,10 +628,10 @@ export default function App() {
     if (!email) return "Email is required.";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address.";
     if (!password || password.length < 8) return "Temporary password must be at least 8 characters.";
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return "Not authenticated.";
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession?.access_token) return "Not authenticated.";
     const { data: result, error: invokeError } = await supabase.functions.invoke("admin-create-user", {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${authSession.access_token}` },
       body: { email, password, name, role: "staff", mustChangePassword: true },
     });
     if (invokeError || result?.error) {
@@ -536,10 +652,10 @@ export default function App() {
     if (!target || target.role !== "staff") return "Staff account not found.";
     const remainingStaff = users.filter(u => u.role === "staff" && u.id !== id);
     if (remainingStaff.length === 0) return "Cannot remove the last staff account.";
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return "Not authenticated.";
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession?.access_token) return "Not authenticated.";
     const { data, error: invokeError } = await supabase.functions.invoke("admin-delete-user", {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${authSession.access_token}` },
       body: { userId: id },
     });
     if (invokeError || data?.error) {
@@ -552,10 +668,10 @@ export default function App() {
 
   const addBroker = async data => {
     if (!data.tempPassword || data.tempPassword.length < 8) return "Temporary password must be at least 8 characters.";
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.access_token) return "Not authenticated.";
+    const { data: { session: authSession } } = await supabase.auth.getSession();
+    if (!authSession?.access_token) return "Not authenticated.";
     const { data: result, error: invokeError } = await supabase.functions.invoke("admin-create-user", {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${authSession.access_token}` },
       body: {
         email: data.email.trim().toLowerCase(),
         password: data.tempPassword,
@@ -588,8 +704,7 @@ export default function App() {
     if (error) return error.message;
     await supabase.from("profiles").update({ must_change_password: false }).eq("id", session.id);
     setSession({ ...session, mustChangePassword: false });
-    setView("dashboard");
-    setPage("dashboard");
+    navigate("/dashboard", { replace: true });
     return null;
   };
 
@@ -611,7 +726,11 @@ export default function App() {
 
   const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
 
-  if (view === "loading") return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
+  const myRequests   = requests.filter(r => r.brokerId === session?.id);
+  const rentReqs     = requests.filter(r => r.type === "rent");
+  const cmaReqs      = requests.filter(r => r.type === "cma");
+  const pdrReqs      = requests.filter(r => r.type === "pdr");
+  const referralReqs = requests.filter(r => r.type === "referral");
 
   return (
     <>
@@ -624,23 +743,82 @@ export default function App() {
           <button className="btn btn-secondary btn-sm" onClick={() => setShowInstall(false)}>✕</button>
         </div>
       )}
-      {view==="login"           && <LoginScreen onLogin={login} onRegister={() => setView("register")} onForgotPassword={() => setView("forgot")} />}
-      {view==="register"        && <RegisterScreen onRegister={register} onBack={() => setView("login")} />}
-      {view==="forgot"          && <ForgotPasswordScreen onForgotPassword={forgotPassword} onBack={() => setView("login")} />}
-      {view==="reset"           && <ResetPasswordScreen onResetPassword={resetPassword} onBack={async () => { await supabase.auth.signOut(); setView("login"); }} />}
-      {view==="change-password" && session && <ChangePasswordScreen onChangePassword={changePassword} />}
-      {view==="dashboard" && session && (
-        <AppShell session={session} setView={setView} page={page} setPage={setPage} onLogout={logout}
-          users={users} requests={requests} onApprove={approveUser} onReject={rejectUser}
-          onAddBroker={addBroker} onSubmitRequest={submitRequest} onUpdateRequest={updateRequest}
-          onAddStaff={addStaff} onRemoveStaff={removeStaff} />
-      )}
+      <Routes>
+        <Route path="/login"           element={<LoginScreen onLogin={login} />} />
+        <Route path="/register"        element={<RegisterScreen onRegister={register} />} />
+        <Route path="/forgot-password" element={<ForgotPasswordScreen onForgotPassword={forgotPassword} />} />
+        <Route path="/reset-password"  element={<ResetPasswordScreen onResetPassword={resetPassword} onSignOut={() => supabase.auth.signOut()} />} />
+        <Route path="/pdr"             element={<PDRPublicForm />} />
+
+        <Route path="/change-password" element={
+          <ProtectedRoute session={session} isLoading={isLoading}>
+            <ChangePasswordScreen onChangePassword={changePassword} />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/" element={
+          <ProtectedRoute session={session} isLoading={isLoading}>
+            <AppShell session={session} onLogout={logout} requests={requests} users={users} />
+          </ProtectedRoute>
+        }>
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={
+            session?.role === "staff"
+              ? <AdminDashboard requests={requests} users={users} />
+              : <BrokerDashboard session={session} requests={myRequests} />
+          } />
+          <Route path="rent-requests" element={
+            session?.role === "staff"
+              ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} type="rent" />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="cma-requests" element={
+            session?.role === "staff"
+              ? <AdminRequests requests={cmaReqs} onUpdate={updateRequest} type="cma" />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="pdr-reports" element={
+            session?.role === "staff"
+              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="referrals" element={
+            session?.role === "staff"
+              ? <AdminReferrals requests={referralReqs} onUpdate={updateRequest} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="brokers" element={
+            session?.role === "staff"
+              ? <AdminBrokers users={users} onApprove={approveUser} onReject={rejectUser} onAddBroker={addBroker} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="staff" element={
+            session?.role === "staff"
+              ? <AdminStaff users={users} session={session} onAddStaff={addStaff} onRemoveStaff={removeStaff} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="requests" element={
+            session?.role === "broker"
+              ? <BrokerRequests requests={myRequests} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="requests/new" element={
+            session?.role === "broker"
+              ? <NewRequest onSubmit={submitRequest} session={session} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
     </>
   );
 }
 
 // ── Login ─────────────────────────────────────────────────────────────────────
-function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
+function LoginScreen({ onLogin }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [pass,  setPass]  = useState("");
   const [err,   setErr]   = useState("");
@@ -668,8 +846,8 @@ function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
         <div className="field"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••" /></div>
         <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Signing in…" : "Sign In →"}</button>
         <div className="divider" />
-        <p style={{fontSize:14,color:"#888",textAlign:"center"}}>New broker? <span className="text-link" onClick={onRegister}>Request access</span></p>
-        <p style={{fontSize:13,color:"#aaa",textAlign:"center",marginTop:8}}><span className="text-link" onClick={onForgotPassword}>Forgot password?</span></p>
+        <p style={{fontSize:14,color:"#888",textAlign:"center"}}>New broker? <span className="text-link" onClick={() => navigate("/register")}>Request access</span></p>
+        <p style={{fontSize:13,color:"#aaa",textAlign:"center",marginTop:8}}><span className="text-link" onClick={() => navigate("/forgot-password")}>Forgot password?</span></p>
       </div>
       <div className="auth-deco">
         <div className="deco-quote">Fast rent letters and comparative market analyses — powered by Fulcrum Australia.</div>
@@ -679,7 +857,8 @@ function LoginScreen({ onLogin, onRegister, onForgotPassword }) {
 }
 
 // ── Register ──────────────────────────────────────────────────────────────────
-function RegisterScreen({ onRegister, onBack }) {
+function RegisterScreen({ onRegister }) {
+  const navigate = useNavigate();
   const [form, setForm] = useState({ name:"", email:"", company:"", phone:"", password:"", confirm:"" });
   const [err,  setErr]  = useState("");
   const [done, setDone] = useState(false);
@@ -697,7 +876,7 @@ function RegisterScreen({ onRegister, onBack }) {
         {done ? (
           <div>
             <div className="alert alert-success" style={{fontSize:15,padding:"20px 24px"}}>✅ Registration submitted! Pending admin approval.</div>
-            <button className="btn btn-secondary mt" onClick={onBack}>← Back to Sign In</button>
+            <button className="btn btn-secondary mt" onClick={() => navigate("/login")}>← Back to Sign In</button>
           </div>
         ) : (
           <>
@@ -715,7 +894,7 @@ function RegisterScreen({ onRegister, onBack }) {
             </div>
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center"}} onClick={submit}>Submit Request →</button>
             <div className="divider" />
-            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={onBack}>← Back to Sign In</span></p>
+            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={() => navigate("/login")}>← Back to Sign In</span></p>
           </>
         )}
       </div>
@@ -727,7 +906,8 @@ function RegisterScreen({ onRegister, onBack }) {
 }
 
 // ── Forgot Password ───────────────────────────────────────────────────────────
-function ForgotPasswordScreen({ onForgotPassword, onBack }) {
+function ForgotPasswordScreen({ onForgotPassword }) {
+  const navigate = useNavigate();
   const [email,   setEmail]   = useState("");
   const [err,     setErr]     = useState("");
   const [done,    setDone]    = useState(false);
@@ -748,7 +928,7 @@ function ForgotPasswordScreen({ onForgotPassword, onBack }) {
         {done ? (
           <div>
             <div className="alert alert-success" style={{fontSize:15,padding:"20px 24px"}}>✅ If that email exists, password reset instructions have been sent.</div>
-            <button className="btn btn-secondary mt" onClick={onBack}>← Back to Sign In</button>
+            <button className="btn btn-secondary mt" onClick={() => navigate("/login")}>← Back to Sign In</button>
           </div>
         ) : (
           <>
@@ -757,7 +937,7 @@ function ForgotPasswordScreen({ onForgotPassword, onBack }) {
             <div className="field"><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="you@example.com" /></div>
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Sending…" : "Send Reset Link →"}</button>
             <div className="divider" />
-            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={onBack}>← Back to Sign In</span></p>
+            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={() => navigate("/login")}>← Back to Sign In</span></p>
           </>
         )}
       </div>
@@ -769,7 +949,8 @@ function ForgotPasswordScreen({ onForgotPassword, onBack }) {
 }
 
 // ── Reset Password ────────────────────────────────────────────────────────────
-function ResetPasswordScreen({ onResetPassword, onBack }) {
+function ResetPasswordScreen({ onResetPassword, onSignOut }) {
+  const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirm,  setConfirm]  = useState("");
   const [err,      setErr]      = useState("");
@@ -794,7 +975,7 @@ function ResetPasswordScreen({ onResetPassword, onBack }) {
         {done ? (
           <div>
             <div className="alert alert-success" style={{fontSize:15,padding:"20px 24px"}}>✅ Your password has been reset. You can now sign in.</div>
-            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:16}} onClick={onBack}>Sign In →</button>
+            <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:16}} onClick={() => navigate("/login")}>Sign In →</button>
           </div>
         ) : (
           <>
@@ -803,7 +984,7 @@ function ResetPasswordScreen({ onResetPassword, onBack }) {
             <div className="field"><label>Confirm Password</label><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Saving…" : "Reset Password →"}</button>
             <div className="divider" />
-            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={onBack}>← Back to Sign In</span></p>
+            <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={async () => { await onSignOut(); navigate("/login"); }}>← Back to Sign In</span></p>
           </>
         )}
       </div>
@@ -847,101 +1028,95 @@ function ChangePasswordScreen({ onChangePassword }) {
 }
 
 // ── App Shell ─────────────────────────────────────────────────────────────────
-function AppShell({ session, setView, page, setPage, onLogout, users, requests, onApprove, onReject, onAddBroker, onSubmitRequest, onUpdateRequest, onAddStaff, onRemoveStaff }) {
-  useEffect(() => {
-    if (session?.mustChangePassword) setView("change-password");
-  }, [session]);
-  if (session?.mustChangePassword) return null;
-  const isStaff  = session.role === "staff";
-  const isBroker = session.role === "broker";
+function AppShell({ session, onLogout, requests, users }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const dirtyRef = useRef(false);
+
+  const isStaff = session.role === "staff";
   const pendingApprovals = users.filter(u => u.role==="broker" && u.status==="pending").length;
   const pendingRent = requests.filter(r => r.type==="rent" && r.status==="pending").length;
   const pendingCMA  = requests.filter(r => r.type==="cma"  && r.status==="pending").length;
   const pendingPDR  = requests.filter(r => r.type==="pdr"  && r.status==="pending").length;
 
   const adminNav = [
-    { id:"dashboard",     icon:"📊", label:"Dashboard" },
+    { path:"/dashboard",     icon:"📊", label:"Dashboard" },
     { section:"Rent Letters" },
-    { id:"rent-requests", icon:"📋", label:"Rent Requests", badge:pendingRent },
+    { path:"/rent-requests", icon:"📋", label:"Rent Requests", badge:pendingRent },
     { section:"Market Analysis" },
-    { id:"cma-requests",  icon:"🏡", label:"CMA Requests",  badge:pendingCMA  },
+    { path:"/cma-requests",  icon:"🏡", label:"CMA Requests",  badge:pendingCMA  },
     { section:"Price Discovery" },
-    { id:"pdr-requests",  icon:"🔍", label:"PDR Reports",    badge:pendingPDR },
+    { path:"/pdr-reports",   icon:"🔍", label:"PDR Reports",   badge:pendingPDR },
     { section:"Referrals" },
-    { id:"referrals",     icon:"🤝", label:"Referrals",     badge:requests.filter(r=>r.type==="referral"&&r.status==="pending").length },
+    { path:"/referrals",     icon:"🤝", label:"Referrals",     badge:requests.filter(r=>r.type==="referral"&&r.status==="pending").length },
     { section:"Admin" },
-    { id:"brokers",        icon:"👥", label:"Brokers",        badge:pendingApprovals },
-    { id:"staff-accounts", icon:"🔐", label:"Staff Accounts" },
+    { path:"/brokers",       icon:"👥", label:"Brokers",       badge:pendingApprovals },
+    { path:"/staff",         icon:"🔐", label:"Staff Accounts" },
   ];
   const brokerNav = [
-    { id:"dashboard", icon:"🏠", label:"Dashboard" },
-    { id:"new",       icon:"✏️",  label:"New Request" },
-    { id:"requests",  icon:"📋", label:"My Requests" },
+    { path:"/dashboard",    icon:"🏠", label:"Dashboard" },
+    { path:"/requests/new", icon:"✏️",  label:"New Request" },
+    { path:"/requests",     icon:"📋", label:"My Requests" },
   ];
   const nav = isStaff ? adminNav : brokerNav;
-
   const navItems = nav.filter(n => !n.section);
 
+  const handleNav = path => {
+    if (dirtyRef.current && !window.confirm("You have unsaved changes. Leave anyway?")) return;
+    navigate(path);
+  };
+
   return (
-    <div className="shell">
-      <div className="mobile-header">
-        <img src="/No BG, Light Text.png" style={{height:30}} alt="Fulcrum Australia" />
-        <div className="mobile-header-user">
-          <span style={{fontSize:13,color:"rgba(255,255,255,.8)"}}>{session.name}</span>
-          <button className="mobile-signout" onClick={onLogout}>Sign Out</button>
-        </div>
-      </div>
-      <aside className="sidebar">
-        <div className="sidebar-logo"><img src="/No BG, Light Text.png" style={{maxWidth:140,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
-        <nav className="nav">
-          {nav.map((n,i) => n.section
-            ? <div key={i} className="nav-section">{n.section}</div>
-            : (
-              <div key={n.id} className={`nav-item${page===n.id?" active":""}`} onClick={()=>setPage(n.id)}>
-                <span className="nav-icon">{n.icon}</span>
-                <span>{n.label}</span>
-                {n.badge>0 && <span style={{marginLeft:"auto",background:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.9)",borderRadius:2,padding:"1px 7px",fontSize:11,fontWeight:700}}>{n.badge}</span>}
-              </div>
-            )
-          )}
-        </nav>
-        <div className="sidebar-footer">
-          <div className="user-chip">Signed in as</div>
-          <div className="user-name">{session.name}</div>
-          <button className="btn-signout" onClick={onLogout}>Sign Out</button>
-        </div>
-      </aside>
-      <main className="main">
-        {isStaff && <>
-          {page==="dashboard"     && <AdminDashboard requests={requests} users={users} setPage={setPage} />}
-          {page==="rent-requests" && <AdminRequests  requests={requests.filter(r=>r.type==="rent")} onUpdate={onUpdateRequest} type="rent" />}
-          {page==="cma-requests"  && <AdminRequests  requests={requests.filter(r=>r.type==="cma")}  onUpdate={onUpdateRequest} type="cma"  />}
-          {page==="pdr-requests"  && <AdminPDRRequests requests={requests.filter(r=>r.type==="pdr")} onUpdate={onUpdateRequest} />}
-          {page==="referrals"     && <AdminReferrals  requests={requests.filter(r=>r.type==="referral")} onUpdate={onUpdateRequest} />}
-          {page==="brokers"       && <AdminBrokers   users={users} onApprove={onApprove} onReject={onReject} onAddBroker={onAddBroker} />}
-          {page==="staff-accounts" && session?.role==="staff" && <AdminStaff users={users} session={session} onAddStaff={onAddStaff} onRemoveStaff={onRemoveStaff} />}
-        </>}
-        {isBroker && <>
-          {page==="dashboard" && <BrokerDashboard session={session} requests={requests.filter(r=>r.brokerId===session.id)} setPage={setPage} />}
-          {page==="new"       && <NewRequest onSubmit={onSubmitRequest} onDone={()=>setPage("requests")} />}
-          {page==="requests"  && <BrokerRequests requests={requests.filter(r=>r.brokerId===session.id)} />}
-        </>}
-      </main>
-      <nav className="bottom-nav">
-        {navItems.map(n => (
-          <div key={n.id} className={`bottom-nav-item${page===n.id?" active":""}`} onClick={()=>setPage(n.id)}>
-            {n.badge>0 && <span className="bottom-nav-badge">{n.badge}</span>}
-            <span className="bottom-nav-icon">{n.icon}</span>
-            <span className="bottom-nav-label">{n.label}</span>
+    <DirtyCtx.Provider value={{ dirtyRef }}>
+      <div className="shell">
+        <div className="mobile-header">
+          <img src="/No BG, Light Text.png" style={{height:30}} alt="Fulcrum Australia" />
+          <div className="mobile-header-user">
+            <span style={{fontSize:13,color:"rgba(255,255,255,.8)"}}>{session.name}</span>
+            <button className="mobile-signout" onClick={onLogout}>Sign Out</button>
           </div>
-        ))}
-      </nav>
-    </div>
+        </div>
+        <aside className="sidebar">
+          <div className="sidebar-logo"><img src="/No BG, Light Text.png" style={{maxWidth:140,display:"block",margin:"0 auto"}} alt="Fulcrum Australia" /></div>
+          <nav className="nav">
+            {nav.map((n,i) => n.section
+              ? <div key={i} className="nav-section">{n.section}</div>
+              : (
+                <div key={n.path} className={`nav-item${pathname===n.path?" active":""}`} onClick={() => handleNav(n.path)}>
+                  <span className="nav-icon">{n.icon}</span>
+                  <span>{n.label}</span>
+                  {n.badge>0 && <span style={{marginLeft:"auto",background:"rgba(255,255,255,.15)",color:"rgba(255,255,255,.9)",borderRadius:2,padding:"1px 7px",fontSize:11,fontWeight:700}}>{n.badge}</span>}
+                </div>
+              )
+            )}
+          </nav>
+          <div className="sidebar-footer">
+            <div className="user-chip">Signed in as</div>
+            <div className="user-name">{session.name}</div>
+            <button className="btn-signout" onClick={onLogout}>Sign Out</button>
+          </div>
+        </aside>
+        <main className="main">
+          <Breadcrumbs />
+          <Outlet />
+        </main>
+        <nav className="bottom-nav">
+          {navItems.map(n => (
+            <div key={n.path} className={`bottom-nav-item${pathname===n.path?" active":""}`} onClick={() => handleNav(n.path)}>
+              {n.badge>0 && <span className="bottom-nav-badge">{n.badge}</span>}
+              <span className="bottom-nav-icon">{n.icon}</span>
+              <span className="bottom-nav-label">{n.label}</span>
+            </div>
+          ))}
+        </nav>
+      </div>
+    </DirtyCtx.Provider>
   );
 }
 
 // ── Admin Dashboard ───────────────────────────────────────────────────────────
-function AdminDashboard({ requests, users, setPage }) {
+function AdminDashboard({ requests, users }) {
+  const navigate = useNavigate();
   const complete      = requests.filter(r=>r.status==="complete");
   const rentPending   = requests.filter(r=>r.type==="rent"&&r.status==="pending");
   const cmaPending    = requests.filter(r=>r.type==="cma" &&r.status==="pending");
@@ -961,7 +1136,7 @@ function AdminDashboard({ requests, users, setPage }) {
         <div className="card" style={{marginBottom:16,borderLeft:"3px solid var(--danger)"}}>
           <div className="row-between">
             <div className="card-title" style={{margin:0}}>⚠️ Brokers Awaiting Approval</div>
-            <button className="btn btn-secondary btn-sm" onClick={()=>setPage("brokers")}>Manage →</button>
+            <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/brokers")}>Manage →</button>
           </div>
           <p style={{fontSize:14,color:"#888",marginTop:8}}>{awaitApproval.map(u=>`${u.name} (${u.company})`).join(" · ")}</p>
         </div>
@@ -970,8 +1145,8 @@ function AdminDashboard({ requests, users, setPage }) {
         <div className="row-between">
           <div className="card-title" style={{margin:0}}>Recent Requests</div>
           <div className="row" style={{gap:8}}>
-            <button className="btn btn-secondary btn-sm" onClick={()=>setPage("rent-requests")}>Rent Letters →</button>
-            <button className="btn btn-secondary btn-sm" onClick={()=>setPage("cma-requests")}>CMAs →</button>
+            <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/rent-requests")}>Rent Letters →</button>
+            <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/cma-requests")}>CMAs →</button>
           </div>
         </div>
         <table className="tbl" style={{marginTop:16}}>
@@ -1347,7 +1522,8 @@ function AdminReferrals({ requests, onUpdate }) {
 }
 
 // ── Broker Dashboard ──────────────────────────────────────────────────────────
-function BrokerDashboard({ session, requests, setPage }) {
+function BrokerDashboard({ session, requests }) {
+  const navigate = useNavigate();
   const complete     = requests.filter(r=>r.status==="complete");
   const rentReqs     = requests.filter(r=>r.type==="rent");
   const cmaReqs      = requests.filter(r=>r.type==="cma");
@@ -1367,8 +1543,8 @@ function BrokerDashboard({ session, requests, setPage }) {
         <div className="stat"><div className="stat-num" style={{color:"#7a4a00"}}>{referralReqs.length}</div><div className="stat-label">Referrals</div></div>
       </div>
       <div className="row" style={{marginBottom:20,gap:12}}>
-        <button className="btn btn-primary" onClick={()=>setPage("new")}>✏️ New Request</button>
-        <button className="btn btn-secondary" onClick={()=>setPage("requests")}>View All Requests</button>
+        <button className="btn btn-primary" onClick={()=>navigate("/requests/new")}>✏️ New Request</button>
+        <button className="btn btn-secondary" onClick={()=>navigate("/requests")}>View All Requests</button>
       </div>
       {recent.length>0 ? (
         <div className="card">
@@ -1392,7 +1568,7 @@ function BrokerDashboard({ session, requests, setPage }) {
         <div className="card" style={{textAlign:"center",padding:"60px 20px"}}>
           <div style={{fontSize:48,marginBottom:16}}>📄</div>
           <p style={{color:"#aaa",marginBottom:20}}>No requests yet. Submit your first request to get started.</p>
-          <button className="btn btn-primary" onClick={()=>setPage("new")}>✏️ New Request</button>
+          <button className="btn btn-primary" onClick={()=>navigate("/requests/new")}>✏️ New Request</button>
         </div>
       )}
     </>
@@ -1400,7 +1576,8 @@ function BrokerDashboard({ session, requests, setPage }) {
 }
 
 // ── New Request ───────────────────────────────────────────────────────────────
-function NewRequest({ onSubmit, onDone }) {
+function NewRequest({ onSubmit, session }) {
+  const navigate = useNavigate();
   const [type,     setType]     = useState(null);
   const [done,     setDone]     = useState(false);
   const [lastType, setLastType] = useState(null);
@@ -1419,7 +1596,7 @@ function NewRequest({ onSubmit, onDone }) {
           }
         </p>
         <div className="row" style={{justifyContent:"center",gap:12}}>
-          <button className="btn btn-primary" onClick={onDone}>View My Requests</button>
+          <button className="btn btn-primary" onClick={() => navigate("/requests")}>View My Requests</button>
           <button className="btn btn-secondary" onClick={()=>{ setType(null); setDone(false); }}>Submit Another</button>
         </div>
       </div>
@@ -1458,27 +1635,33 @@ function NewRequest({ onSubmit, onDone }) {
       )}
       {type==="rent"     && <RentForm     onSubmit={handleSubmit} onBack={()=>setType(null)} />}
       {type==="cma"      && <CMAForm      onSubmit={handleSubmit} onBack={()=>setType(null)} />}
-      {type==="pdr"      && <PDRBrokerForm onSubmit={handleSubmit} onBack={()=>setType(null)} session={null} />}
+      {type==="pdr"      && <PDRBrokerForm onSubmit={handleSubmit} onBack={()=>setType(null)} session={session} />}
       {type==="referral" && <ReferralForm  onSubmit={handleSubmit} onBack={()=>setType(null)} />}
     </div>
   );
 }
 
 function RentForm({ onSubmit, onBack }) {
-  const [form, setForm] = useState({ address:"", weeklyRent:"", notes:"" });
+  const INITIAL = { address:"", weeklyRent:"", notes:"" };
+  const [form, setForm, clearDraft] = useDraft('draft:new-request:rent', INITIAL);
   const [err,  setErr]  = useState("");
   const [loading, setLoading] = useState(false);
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+  const isDirty = isDraftDirty(form, INITIAL);
+  useUnsavedWarning(isDirty);
+  const { dirtyRef } = useContext(DirtyCtx);
+  useEffect(() => { dirtyRef.current = isDirty; return () => { dirtyRef.current = false; }; }, [isDirty]);
+  const handleBack = () => { if (isDirty && !window.confirm("Discard changes?")) return; onBack(); };
   const submit = async () => {
     if (!form.address.trim()) return setErr("Property address is required.");
     if (!form.weeklyRent||isNaN(form.weeklyRent)||Number(form.weeklyRent)<=0) return setErr("Please enter a valid weekly rent amount.");
-    setLoading(true); await onSubmit(form); setLoading(false);
+    setLoading(true); await onSubmit(form); clearDraft(); setLoading(false);
   };
   return (
     <div className="card" style={{marginTop:16}}>
       <div className="row-between" style={{marginBottom:16}}>
         <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>📄 Rent Letter Request</div>
-        <button className="btn btn-secondary btn-sm" onClick={onBack}>← Change type</button>
+        <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
       <div className="field">
@@ -1507,19 +1690,25 @@ function RentForm({ onSubmit, onBack }) {
 }
 
 function CMAForm({ onSubmit, onBack }) {
-  const [form, setForm] = useState({ address:"", expectedValue:"", notes:"" });
+  const INITIAL = { address:"", expectedValue:"", notes:"" };
+  const [form, setForm, clearDraft] = useDraft('draft:new-request:cma', INITIAL);
   const [err,  setErr]  = useState("");
   const [loading, setLoading] = useState(false);
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+  const isDirty = isDraftDirty(form, INITIAL);
+  useUnsavedWarning(isDirty);
+  const { dirtyRef } = useContext(DirtyCtx);
+  useEffect(() => { dirtyRef.current = isDirty; return () => { dirtyRef.current = false; }; }, [isDirty]);
+  const handleBack = () => { if (isDirty && !window.confirm("Discard changes?")) return; onBack(); };
   const submit = async () => {
     if (!form.address.trim()) return setErr("Property address is required.");
-    setLoading(true); await onSubmit(form); setLoading(false);
+    setLoading(true); await onSubmit(form); clearDraft(); setLoading(false);
   };
   return (
     <div className="card" style={{marginTop:16}}>
       <div className="row-between" style={{marginBottom:16}}>
         <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🏡 Market Analysis Request</div>
-        <button className="btn btn-secondary btn-sm" onClick={onBack}>← Change type</button>
+        <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
       <div className="field">
@@ -1548,22 +1737,28 @@ function CMAForm({ onSubmit, onBack }) {
 }
 
 function ReferralForm({ onSubmit, onBack }) {
-  const [form, setForm] = useState({ clientName:"", clientEmail:"", clientMobile:"", situation:"" });
+  const INITIAL = { clientName:"", clientEmail:"", clientMobile:"", situation:"" };
+  const [form, setForm, clearDraft] = useDraft('draft:new-request:referral', INITIAL);
   const [err,  setErr]  = useState("");
   const [loading, setLoading] = useState(false);
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
+  const isDirty = isDraftDirty(form, INITIAL);
+  useUnsavedWarning(isDirty);
+  const { dirtyRef } = useContext(DirtyCtx);
+  useEffect(() => { dirtyRef.current = isDirty; return () => { dirtyRef.current = false; }; }, [isDirty]);
+  const handleBack = () => { if (isDirty && !window.confirm("Discard changes?")) return; onBack(); };
   const submit = async () => {
     if (!form.clientName.trim())  return setErr("Client name is required.");
     if (!form.clientEmail.trim()) return setErr("Client email is required.");
     if (!/\S+@\S+\.\S+/.test(form.clientEmail)) return setErr("Please enter a valid email address.");
     if (!form.situation.trim())   return setErr("Please provide a brief description of the client and their situation.");
-    setLoading(true); await onSubmit(form); setLoading(false);
+    setLoading(true); await onSubmit(form); clearDraft(); setLoading(false);
   };
   return (
     <div className="card" style={{marginTop:16}}>
       <div className="row-between" style={{marginBottom:16}}>
         <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🤝 Client Referral</div>
-        <button className="btn btn-secondary btn-sm" onClick={onBack}>← Change type</button>
+        <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
       <div className="field">
@@ -1661,19 +1856,21 @@ function Detail({ label, val, full }) {
 }
 
 // ── Price Discovery Report — Public Client Form ───────────────────────────────
-// Accessible at ?pdr=<brokerId> — no login required for clients
+// Accessible at /pdr?id=<brokerId> — no login required for clients
 export function PDRPublicForm() {
-  // Parse broker id from URL
-  const brokerId = new URLSearchParams(window.location.search).get("pdr") || "";
+  const [searchParams] = useSearchParams();
+  const brokerId = searchParams.get("id") || "";
   const [step, setStep]   = useState(0);
   const [done, setDone]   = useState(false);
-  const [form, setForm]   = useState({
+  const PDR_INITIAL = {
     clientName:"", clientEmail:"", clientMobile:"",
     budgetMin:"", budgetMax:"",
     propertyTypes:[], bedrooms:"", bathrooms:"",
     locations:"", purpose:"owner", rentalYield:"", notes:""
-  });
+  };
+  const [form, setForm, clearDraft] = useDraft(`draft:pdr-public:${brokerId}`, PDR_INITIAL);
   const [err, setErr] = useState("");
+  useUnsavedWarning(!done && isDraftDirty(form, PDR_INITIAL));
 
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
   const togglePT = pt => setForm(f=>({
@@ -1710,6 +1907,7 @@ export function PDRPublicForm() {
         message: `A new Price Discovery Report request has been submitted.\n\nClient: ${form.clientName}\nEmail: ${form.clientEmail}\nMobile: ${form.clientMobile}\nBudget: ${form.budgetMin ? `$${Number(form.budgetMin).toLocaleString()} – ` : ""}$${Number(form.budgetMax).toLocaleString()}\nLocations: ${form.locations}\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review and complete this request.`
       });
       sendWhatsApp(`New PDR Submission\nClient: ${form.clientName}\nEmail: ${form.clientEmail}\nMobile: ${form.clientMobile || "—"}`);
+      clearDraft();
       setDone(true);
     } catch { setErr("Something went wrong. Please try again."); }
   };
@@ -1877,15 +2075,21 @@ export function PDRPublicForm() {
 }
 
 // ── Price Discovery — Broker Submission Form (inside portal) ──────────────────
-function PDRBrokerForm({ onSubmit, onBack }) {
-  const [form, setForm] = useState({
+function PDRBrokerForm({ onSubmit, onBack, session }) {
+  const INITIAL = {
     clientName:"", clientEmail:"", clientMobile:"",
     budgetMin:"", budgetMax:"",
     propertyTypes:[], bedrooms:"", bathrooms:"",
     locations:"", purpose:"owner", rentalYield:"", notes:""
-  });
+  };
+  const [form, setForm, clearDraft] = useDraft('draft:new-request:pdr', INITIAL);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const isDirty = isDraftDirty(form, INITIAL);
+  useUnsavedWarning(isDirty);
+  const { dirtyRef } = useContext(DirtyCtx);
+  useEffect(() => { dirtyRef.current = isDirty; return () => { dirtyRef.current = false; }; }, [isDirty]);
+  const handleBack = () => { if (isDirty && !window.confirm("Discard changes?")) return; onBack(); };
 
   const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
   const togglePT = pt => setForm(f=>({
@@ -1899,14 +2103,14 @@ function PDRBrokerForm({ onSubmit, onBack }) {
     if (!form.budgetMax) return setErr("Maximum budget is required.");
     if (form.propertyTypes.length===0) return setErr("Please select at least one property type.");
     if (!form.locations.trim()) return setErr("Please enter at least one preferred suburb.");
-    setLoading(true); await onSubmit(form); setLoading(false);
+    setLoading(true); await onSubmit(form); clearDraft(); setLoading(false);
   };
 
   return (
     <div className="card" style={{marginTop:16,maxWidth:640}}>
       <div className="row-between" style={{marginBottom:16}}>
         <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🔍 Price Discovery Report</div>
-        <button className="btn btn-secondary btn-sm" onClick={onBack}>← Change type</button>
+        <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
 
@@ -1989,7 +2193,7 @@ function PDRBrokerForm({ onSubmit, onBack }) {
 
       <div className="divider" />
       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
-        <div style={{fontSize:12,color:"#aaa"}}>Or <span className="text-link" onClick={()=>{ const link=window.location.origin+window.location.pathname+"?pdr=broker"; navigator.clipboard?.writeText(link); alert("Client link copied!\n\n"+link); }}>copy client link ↗</span></div>
+        <div style={{fontSize:12,color:"#aaa"}}>Or <span className="text-link" onClick={()=>{ const link=`${window.location.origin}/pdr?id=${session?.id||""}`; navigator.clipboard?.writeText(link); alert("Client link copied!\n\n"+link); }}>copy client link ↗</span></div>
         <button className="btn btn-purple" onClick={submit} disabled={loading}>{loading?"Submitting…":"Submit Report →"}</button>
       </div>
     </div>

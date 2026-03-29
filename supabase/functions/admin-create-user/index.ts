@@ -34,7 +34,7 @@ Deno.serve(async (req) => {
   const { data: userData, error: authError } = await adminClient.auth.getUser(token);
   if (authError || !userData?.user) {
     console.error("[auth] getUser failed:", authError);
-    return json({ error: "Unauthorized" }, 401);
+    return json({ error: "Unauthorized", debug: authError?.message ?? "no user returned" }, 401);
   }
   const userId = userData.user.id;
 
