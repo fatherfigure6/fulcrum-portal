@@ -123,6 +123,10 @@ const CSS = `
   .field textarea { height:auto; padding:10px 12px; }
   .field input:focus,.field select:focus,.field textarea:focus { border-color:var(--primary); box-shadow:0 0 0 3px rgba(44,62,80,.12); }
   .field .hint { font-size:12px; color:#aaa; margin-top:4px; }
+  .pw-wrap { position:relative; }
+  .pw-wrap input { padding-right:52px !important; }
+  .pw-eye { position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer; font-size:11px; font-weight:600; letter-spacing:.3px; color:#999; font-family:'Inter',sans-serif; padding:0; line-height:1; }
+  .pw-eye:hover { color:var(--primary); }
   .type-toggle { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:4px; }
   .type-card { padding:16px 18px; border:1px solid var(--border); border-radius:var(--r); cursor:pointer; transition:border-color 150ms ease; background:var(--white); }
   .type-card:hover { border-color:var(--primary); }
@@ -824,6 +828,17 @@ export default function App() {
   );
 }
 
+// ── Password Input with show/hide toggle ──────────────────────────────────────
+function PasswordInput({ value, onChange, onKeyDown, placeholder }) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="pw-wrap">
+      <input type={show?"text":"password"} value={value} onChange={onChange} onKeyDown={onKeyDown} placeholder={placeholder} />
+      <button type="button" className="pw-eye" onClick={()=>setShow(s=>!s)} tabIndex={-1}>{show?"HIDE":"SHOW"}</button>
+    </div>
+  );
+}
+
 // ── Login ─────────────────────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const navigate = useNavigate();
@@ -851,7 +866,7 @@ function LoginScreen({ onLogin }) {
         <div className="auth-title">Sign In</div>
         {err && <div className="alert alert-error">{err}</div>}
         <div className="field"><label>Email</label><input value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="you@example.com" /></div>
-        <div className="field"><label>Password</label><input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••" /></div>
+        <div className="field"><label>Password</label><PasswordInput value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="••••••••" /></div>
         <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Signing in…" : "Sign In →"}</button>
         <div className="divider" />
         <p style={{fontSize:14,color:"#888",textAlign:"center"}}>New broker? <span className="text-link" onClick={() => navigate("/register")}>Request access</span></p>
@@ -897,8 +912,8 @@ function RegisterScreen({ onRegister }) {
             <div className="field"><label>Email *</label><input value={form.email} onChange={set("email")} /></div>
             <div className="field"><label>Phone</label><input value={form.phone} onChange={set("phone")} /></div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-              <div className="field"><label>Password *</label><input type="password" value={form.password} onChange={set("password")} /></div>
-              <div className="field"><label>Confirm *</label><input type="password" value={form.confirm} onChange={set("confirm")} /></div>
+              <div className="field"><label>Password *</label><PasswordInput value={form.password} onChange={set("password")} /></div>
+              <div className="field"><label>Confirm *</label><PasswordInput value={form.confirm} onChange={set("confirm")} /></div>
             </div>
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center"}} onClick={submit}>Submit Request →</button>
             <div className="divider" />
@@ -988,8 +1003,8 @@ function ResetPasswordScreen({ onResetPassword, onSignOut }) {
         ) : (
           <>
             {err && <div className="alert alert-error">{err}</div>}
-            <div className="field"><label>New Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
-            <div className="field"><label>Confirm Password</label><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
+            <div className="field"><label>New Password</label><PasswordInput value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
+            <div className="field"><label>Confirm Password</label><PasswordInput value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
             <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Saving…" : "Reset Password →"}</button>
             <div className="divider" />
             <p style={{fontSize:14,color:"#888",textAlign:"center"}}><span className="text-link" onClick={async () => { await onSignOut(); navigate("/login"); }}>← Back to Sign In</span></p>
@@ -1024,8 +1039,8 @@ function ChangePasswordScreen({ onChangePassword }) {
         <div className="auth-title">Set Your Password</div>
         <p style={{fontSize:14,color:"#888",marginBottom:16}}>You've been given a temporary password. Please set a new password before continuing.</p>
         {err && <div className="alert alert-error">{err}</div>}
-        <div className="field"><label>New Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
-        <div className="field"><label>Confirm Password</label><input type="password" value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
+        <div className="field"><label>New Password</label><PasswordInput value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters" /></div>
+        <div className="field"><label>Confirm Password</label><PasswordInput value={confirm} onChange={e=>setConfirm(e.target.value)} onKeyDown={e=>e.key==="Enter"&&submit()} placeholder="Re-enter password" /></div>
         <button className="btn btn-primary" style={{width:"100%",justifyContent:"center",marginTop:8}} onClick={submit} disabled={loading}>{loading ? "Saving…" : "Set Password & Continue →"}</button>
       </div>
       <div className="auth-deco">
