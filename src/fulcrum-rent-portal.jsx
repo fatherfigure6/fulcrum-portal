@@ -85,6 +85,9 @@ const CSS = `
   .req-card-address { font-size:15px; font-weight:500; overflow-wrap:anywhere; }
   .req-card-date { font-size:12px; color:#888; }
   .req-card-doc { margin-top:2px; }
+  .req-card-name { font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+  .req-card-sub  { font-size:12px; color:#888; overflow-wrap:anywhere; }
+  .req-card-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; }
   .badge { display:inline-block; padding:2px 8px; border-radius:2px; font-size:11px; font-weight:600; letter-spacing:.3px; text-transform:uppercase; }
   .badge-pending  { background:#f5e8e8; color:#8b2020; }
   .badge-complete { background:#e4ede8; color:#2a5c3a; }
@@ -1225,6 +1228,7 @@ function AdminRequests({ requests, onUpdate, type }) {
               onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>{f}</button>
           ))}
         </div>
+        <div className="req-table-wrap">
         <table className="tbl">
           <thead><tr><th>Ref</th><th>Broker</th><th>Property</th><th>{isRent?"Weekly Yield":"Est. Value"}</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -1242,6 +1246,22 @@ function AdminRequests({ requests, onUpdate, type }) {
             {filtered.length===0 && <tr><td colSpan={7}><div className="empty"><div className="empty-icon">📭</div>No requests found</div></td></tr>}
           </tbody>
         </table>
+        </div>
+        <div className="req-cards">
+          {filtered.map(r=>(
+            <div key={r.id} className="req-card">
+              <TypeBadge t={r.type||(isRent?"rent":"cma")} />
+              <div className="req-card-name">{r.address||"—"}</div>
+              <div className="req-card-sub">{r.brokerName}{r.brokerCompany?` · ${r.brokerCompany}`:""}</div>
+              <div className="req-card-date">{fmt(r.createdAt)}</div>
+              <StatusBadge s={r.status} />
+              <div className="req-card-actions">
+                <button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setUploadUrl(r.downloadUrl||""); }}>Manage →</button>
+              </div>
+            </div>
+          ))}
+          {filtered.length===0 && <div className="empty">No requests found</div>}
+        </div>
       </div>
       {selected && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSelected(null)}>
@@ -1337,6 +1357,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
       {pending.length>0 && (
         <div className="card" style={{marginBottom:20}}>
           <div className="card-title">⏳ Pending Approval ({pending.length})</div>
+          <div className="req-table-wrap">
           <table className="tbl">
             <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th></th></tr></thead>
             <tbody>
@@ -1353,10 +1374,26 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
               ))}
             </tbody>
           </table>
+          </div>
+          <div className="req-cards">
+            {pending.map(b=>(
+              <div key={b.id} className="req-card">
+                <div className="req-card-name">{b.name}</div>
+                <div className="req-card-sub">{b.company}</div>
+                <div className="req-card-sub">{b.email}</div>
+                {b.phone && <div className="req-card-sub">{b.phone}</div>}
+                <div className="req-card-actions">
+                  <button className="btn btn-primary btn-sm" onClick={()=>onApprove(b.id)}>Approve</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>onReject(b.id)}>Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
       <div className="card">
         <div className="card-title">✅ Approved Brokers ({approved.length})</div>
+        <div className="req-table-wrap">
         <table className="tbl">
           <thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -1371,6 +1408,26 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
             {approved.length===0 && <tr><td colSpan={5}><div className="empty">No approved brokers yet</div></td></tr>}
           </tbody>
         </table>
+        </div>
+        <div className="req-cards">
+          {approved.map(b=>(
+            <div key={b.id} className="req-card">
+              <div className="req-card-name">{b.name}</div>
+              <div className="req-card-sub">{b.company}</div>
+              <div className="req-card-sub">{b.email}</div>
+              {b.mustChangePassword
+                ? <span className="badge badge-pending">Temp password</span>
+                : <StatusBadge s="approved" />}
+              <div className="req-card-actions">
+                <button className="btn btn-danger btn-sm"
+                  onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) onReject(b.id); }}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+          {approved.length===0 && <div style={{fontSize:14,color:"#aaa"}}>No approved brokers yet</div>}
+        </div>
       </div>
     </>
   );
@@ -1432,6 +1489,7 @@ function AdminStaff({ users, session, onAddStaff, onRemoveStaff }) {
       )}
       <div className="card">
         <div className="card-title">Staff Accounts ({staffUsers.length})</div>
+        <div className="req-table-wrap">
         <table className="tbl">
           <thead><tr><th>Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -1456,6 +1514,28 @@ function AdminStaff({ users, session, onAddStaff, onRemoveStaff }) {
             )}
           </tbody>
         </table>
+        </div>
+        <div className="req-cards">
+          {staffUsers.map(u=>(
+            <div key={u.id} className="req-card">
+              <div className="req-card-name">{u.name}</div>
+              <div className="req-card-sub">{u.email}</div>
+              {u.mustChangePassword
+                ? <span className="badge badge-pending">Temp password</span>
+                : <span className="badge badge-approved">Active</span>}
+              <div className="req-card-actions">
+                {u.id===session.id
+                  ? <span style={{fontSize:12,color:"#aaa"}}>Current user</span>
+                  : <button className="btn btn-danger btn-sm"
+                      disabled={!!removing}
+                      onClick={()=>doRemove(u.id)}>
+                      {removing===u.id?"Removing…":"Remove"}
+                    </button>}
+              </div>
+            </div>
+          ))}
+          {staffUsers.length===0 && <div style={{fontSize:14,color:"#aaa"}}>No staff accounts yet</div>}
+        </div>
       </div>
     </>
   );
@@ -1486,6 +1566,7 @@ function AdminReferrals({ requests, onUpdate }) {
               onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>{f}</button>
           ))}
         </div>
+        <div className="req-table-wrap">
         <table className="tbl">
           <thead><tr><th>Client</th><th>Referred By</th><th>Company</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -1502,6 +1583,22 @@ function AdminReferrals({ requests, onUpdate }) {
             {filtered.length===0 && <tr><td colSpan={6}><div className="empty"><div className="empty-icon">🤝</div>No referrals found</div></td></tr>}
           </tbody>
         </table>
+        </div>
+        <div className="req-cards">
+          {filtered.map(r=>(
+            <div key={r.id} className="req-card">
+              <div className="req-card-name">{r.clientName}</div>
+              <div className="req-card-sub">{r.clientEmail}</div>
+              <div className="req-card-sub">Referred by {r.brokerName}{r.brokerCompany?` · ${r.brokerCompany}`:""}</div>
+              <div className="req-card-date">{fmt(r.createdAt)}</div>
+              <StatusBadge s={r.status} />
+              <div className="req-card-actions">
+                <button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setNotes(r.staffNotes||""); }}>Review →</button>
+              </div>
+            </div>
+          ))}
+          {filtered.length===0 && <div className="empty"><div className="empty-icon">📭</div>No referrals found</div>}
+        </div>
       </div>
       {selected && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSelected(null)}>
@@ -2292,6 +2389,7 @@ function AdminPDRRequests({ requests, onUpdate }) {
             <button key={f} className={`btn ${filter===f?"btn-purple":"btn-secondary"} btn-sm`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>{f}</button>
           ))}
         </div>
+        <div className="req-table-wrap">
         <table className="tbl">
           <thead><tr><th>Client</th><th>Broker</th><th>Budget</th><th>Purpose</th><th>Types</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
           <tbody>
@@ -2310,6 +2408,25 @@ function AdminPDRRequests({ requests, onUpdate }) {
             {filtered.length===0 && <tr><td colSpan={8}><div className="empty"><div className="empty-icon">🔍</div>No PDR requests yet</div></td></tr>}
           </tbody>
         </table>
+        </div>
+        <div className="req-cards">
+          {filtered.map(r=>(
+            <div key={r.id} className="req-card">
+              <div className="req-card-name">{r.clientName}</div>
+              <div className="req-card-sub">{r.clientEmail}</div>
+              <div className="req-card-sub">{r.brokerName?`Via ${r.brokerName}`:"Direct submission"}</div>
+              <div className="req-card-sub">
+                {r.budgetMin?`${fmtMoney(r.budgetMin)} – `:""}{fmtMoney(r.budgetMax)}
+              </div>
+              <div className="req-card-date">{fmt(r.createdAt)}</div>
+              <StatusBadge s={r.status} />
+              <div className="req-card-actions">
+                <button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setUploadUrl(r.downloadUrl||""); }}>Review →</button>
+              </div>
+            </div>
+          ))}
+          {filtered.length===0 && <div className="empty"><div className="empty-icon">📭</div>No PDR requests found</div>}
+        </div>
       </div>
 
       {selected && (
