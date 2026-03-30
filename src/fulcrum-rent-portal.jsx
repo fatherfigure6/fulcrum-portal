@@ -66,7 +66,8 @@ const CSS = `
   .card { background:var(--white); border:1px solid var(--border); border-radius:var(--r); padding:20px 24px; box-shadow:var(--shadow-1); }
   .card+.card { margin-top:16px; }
   .card-title { font-weight:600; font-size:15px; margin-bottom:16px; color:var(--primary); }
-  .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+  .dashboard-shell { width:100%; max-width:1500px; margin:0 auto; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:24px; }
   .stat { background:var(--white); border:1px solid var(--border); border-radius:var(--r); padding:16px 20px; box-shadow:var(--shadow-1); }
   .stat-num { font-family:'Inter',sans-serif; font-size:32px; font-weight:700; color:var(--primary); line-height:1; font-feature-settings:'tnum'; }
   .stat-num.gold  { color:var(--primary); }
@@ -187,7 +188,6 @@ const CSS = `
     .bottom-nav-icon { font-size:20px; line-height:1; }
     .bottom-nav-label { font-size:9px; letter-spacing:.3px; text-transform:uppercase; font-weight:500; }
     .bottom-nav-badge { position:absolute; top:5px; left:calc(50% + 6px); background:#b04040; color:#fff; border-radius:10px; padding:1px 5px; font-size:9px; font-weight:700; line-height:1.4; }
-    .stats { grid-template-columns:repeat(3,1fr) !important; }
     .page-title { font-size:20px; }
     .page-header { margin-bottom:18px; }
     .card { padding:14px 14px; overflow-x:auto; }
@@ -1130,7 +1130,7 @@ function AdminDashboard({ requests, users }) {
   const cmaPending    = requests.filter(r=>r.type==="cma" &&r.status==="pending");
   const awaitApproval = users.filter(u=>u.role==="broker"&&u.status==="pending");
   return (
-    <>
+    <div className="dashboard-shell">
       <div className="page-header"><div className="page-title">Dashboard</div><div className="page-sub">Overview of all portal activity</div></div>
       <div className="stats">
         <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total Requests</div></div>
@@ -1187,7 +1187,7 @@ function AdminDashboard({ requests, users }) {
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1646,12 +1646,12 @@ function BrokerDashboard({ session, requests }) {
   const referralReqs = requests.filter(r=>r.type==="referral");
   const recent       = requests.slice(0,4);
   return (
-    <>
+    <div className="dashboard-shell">
       <div className="page-header">
         <div className="page-title">Welcome, {session.name.split(" ")[0]}</div>
         <div className="page-sub">{session.company} · Property Services Portal</div>
       </div>
-      <div className="stats" style={{gridTemplateColumns:"repeat(5,1fr)"}}>
+      <div className="stats">
         <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total</div></div>
         <div className="stat"><div className="stat-num gold">{rentReqs.length}</div><div className="stat-label">Rent Letters</div></div>
         <div className="stat"><div className="stat-num teal">{cmaReqs.length}</div><div className="stat-label">CMAs</div></div>
@@ -1706,7 +1706,7 @@ function BrokerDashboard({ session, requests }) {
           <button className="btn btn-primary" onClick={()=>navigate("/requests/new")}>✏️ New Request</button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
