@@ -556,6 +556,7 @@ export default function App() {
   };
 
   const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
+  const deleteRequest = async (id, type) => { await saveRequests(requests.filter(r => !(r.id === id && r.type === type))); };
 
   const myRequests   = useMemo(() => requests.filter(r => r.brokerId === session?.id), [requests, session?.id]);
   const rentReqs     = useMemo(() => requests.filter(r => r.type === "rent"),           [requests]);
@@ -599,22 +600,22 @@ export default function App() {
           } />
           <Route path="rent-requests" element={
             session?.role === "staff"
-              ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} type="rent" />
+              ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="rent" />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="cma-requests" element={
             session?.role === "staff"
-              ? <AdminRequests requests={cmaReqs} onUpdate={updateRequest} type="cma" />
+              ? <AdminRequests requests={cmaReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="cma" />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="pdr-reports" element={
             session?.role === "staff"
-              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} />
+              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} onDelete={deleteRequest} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="referrals" element={
             session?.role === "staff"
-              ? <AdminReferrals requests={referralReqs} onUpdate={updateRequest} />
+              ? <AdminReferrals requests={referralReqs} onUpdate={updateRequest} onDelete={deleteRequest} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="brokers" element={
@@ -1027,7 +1028,7 @@ function AdminDashboard({ requests, users }) {
 
 
 // ── Admin / CMA Requests (shared, type-aware) ─────────────────────────────────
-function AdminRequests({ requests, onUpdate, type }) {
+function AdminRequests({ requests, onUpdate, onDelete, type }) {
   const isRent = type === "rent";
   const [selected,  setSelected]  = useState(null);
   const [filter,    setFilter]    = useState("all");
@@ -1119,14 +1120,17 @@ function AdminRequests({ requests, onUpdate, type }) {
                     <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="https://drive.google.com/... or similar" />
                     <div className="hint">Paste a shareable link to the completed PDF</div>
                   </div>
-                  <div className="row" style={{justifyContent:"flex-end",gap:10}}>
-                    <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
-                    {selected.status==="pending" && (
-                      <button className={`btn ${isRent?"btn-primary":"btn-teal"}`} onClick={()=>markComplete(selected)}>✅ Mark Complete & Notify Broker</button>
-                    )}
-                    {selected.status==="complete" && (
-                      <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Download URL</button>
-                    )}
+                  <div className="row" style={{justifyContent:"space-between",gap:10}}>
+                    <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm("Delete this request? This cannot be undone.")){ onDelete(selected.id, selected.type); setSelected(null); } }}>Delete</button>
+                    <div className="row" style={{gap:10}}>
+                      <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
+                      {selected.status==="pending" && (
+                        <button className={`btn ${isRent?"btn-primary":"btn-teal"}`} onClick={()=>markComplete(selected)}>✅ Mark Complete & Notify Broker</button>
+                      )}
+                      {selected.status==="complete" && (
+                        <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Download URL</button>
+                      )}
+                    </div>
                   </div>
                 </>
             }
@@ -1373,7 +1377,7 @@ function AdminStaff({ users, session, onAddStaff, onRemoveStaff }) {
 }
 
 // ── Admin Referrals ───────────────────────────────────────────────────────────
-function AdminReferrals({ requests, onUpdate }) {
+function AdminReferrals({ requests, onUpdate, onDelete }) {
   const [selected, setSelected] = useState(null);
   const [filter,   setFilter]   = useState("all");
   const [notes,    setNotes]    = useState("");
@@ -1453,14 +1457,17 @@ function AdminReferrals({ requests, onUpdate }) {
                     <label>Staff Notes <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
                     <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} placeholder="Internal notes about this referral…" style={{resize:"vertical"}} />
                   </div>
-                  <div className="row" style={{justifyContent:"flex-end",gap:10}}>
-                    <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
-                    {selected.status==="pending" && (
-                      <button className="btn btn-primary" onClick={()=>markComplete(selected)}>✅ Mark Complete</button>
-                    )}
-                    {selected.status==="complete" && (
-                      <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Notes</button>
-                    )}
+                  <div className="row" style={{justifyContent:"space-between",gap:10}}>
+                    <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm("Delete this referral? This cannot be undone.")){ onDelete(selected.id, selected.type); setSelected(null); } }}>Delete</button>
+                    <div className="row" style={{gap:10}}>
+                      <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
+                      {selected.status==="pending" && (
+                        <button className="btn btn-primary" onClick={()=>markComplete(selected)}>✅ Mark Complete</button>
+                      )}
+                      {selected.status==="complete" && (
+                        <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Notes</button>
+                      )}
+                    </div>
                   </div>
                 </>
             }
@@ -2188,7 +2195,7 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
 }
 
 // ── Admin PDR Requests ────────────────────────────────────────────────────────
-function AdminPDRRequests({ requests, onUpdate }) {
+function AdminPDRRequests({ requests, onUpdate, onDelete }) {
   const [selected,  setSelected]  = useState(null);
   const [filter,    setFilter]    = useState("all");
   const [uploadUrl, setUploadUrl] = useState("");
@@ -2286,10 +2293,13 @@ function AdminPDRRequests({ requests, onUpdate }) {
                     <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="https://drive.google.com/... or similar" />
                     <div className="hint">Paste a shareable link to the completed PDF report</div>
                   </div>
-                  <div className="row" style={{justifyContent:"flex-end",gap:10}}>
-                    <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
-                    {selected.status==="pending" && <button className="btn btn-purple" onClick={()=>markComplete(selected)}>✅ Upload & Notify Client</button>}
-                    {selected.status==="complete" && <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Report URL</button>}
+                  <div className="row" style={{justifyContent:"space-between",gap:10}}>
+                    <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm("Delete this report? This cannot be undone.")){ onDelete(selected.id, selected.type); setSelected(null); } }}>Delete</button>
+                    <div className="row" style={{gap:10}}>
+                      <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
+                      {selected.status==="pending" && <button className="btn btn-purple" onClick={()=>markComplete(selected)}>✅ Upload & Notify Client</button>}
+                      {selected.status==="complete" && <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Report URL</button>}
+                    </div>
                   </div>
                 </>
             }
