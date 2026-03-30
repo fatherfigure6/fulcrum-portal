@@ -67,7 +67,7 @@ const CSS = `
   .card+.card { margin-top:16px; }
   .card-title { font-weight:600; font-size:15px; margin-bottom:16px; color:var(--primary); }
   .dashboard-shell { width:100%; max-width:1500px; margin:0 auto; }
-  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:24px; }
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:24px; }
   .stat { background:var(--white); border:1px solid var(--border); border-radius:var(--r); padding:16px 20px; box-shadow:var(--shadow-1); }
   .stat-num { font-family:'Inter',sans-serif; font-size:32px; font-weight:700; color:var(--primary); line-height:1; font-feature-settings:'tnum'; }
   .stat-num.gold  { color:var(--primary); }
