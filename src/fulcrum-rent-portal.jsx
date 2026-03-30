@@ -181,8 +181,8 @@ const CSS = `
     .mobile-header { display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:var(--primary); position:fixed; top:0; left:0; right:0; z-index:50; height:52px; border-bottom:1px solid rgba(255,255,255,.1); }
     .mobile-header-user { display:flex; align-items:center; gap:10px; }
     .mobile-signout { background:transparent; border:1px solid rgba(255,255,255,.3); color:rgba(255,255,255,.8); font-size:12px; padding:5px 10px; border-radius:var(--r); cursor:pointer; font-family:'Inter',sans-serif; }
-    .main { margin-left:0; padding:68px 14px 76px; min-height:100vh; }
-    .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--primary); border-top:1px solid rgba(255,255,255,.1); z-index:50; }
+    .main { margin-left:0; padding:68px 14px calc(76px + env(safe-area-inset-bottom,0px)); min-height:100vh; }
+    .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--primary); border-top:1px solid rgba(255,255,255,.1); z-index:50; padding-bottom:env(safe-area-inset-bottom,0px); }
     .bottom-nav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:7px 2px 8px; color:rgba(255,255,255,.55); cursor:pointer; position:relative; gap:2px; }
     .bottom-nav-item.active { color:#fff; background:rgba(255,255,255,.08); }
     .bottom-nav-icon { font-size:20px; line-height:1; }
