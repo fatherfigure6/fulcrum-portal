@@ -2579,7 +2579,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       }
 
       container = document.createElement('div');
-      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;visibility:hidden;';
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;';
       container.innerHTML = htmlString;
       document.body.appendChild(container);
 
@@ -2605,7 +2605,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       const htmlBlob = new Blob([htmlString], { type: 'text/html' });
       const { error: htmlUploadErr } = await supabase.storage
         .from('pdr-reports')
-        .upload(htmlPath, htmlBlob, { upsert: true, contentType: 'text/html' });
+        .upload(htmlPath, htmlBlob, { upsert: true, contentType: 'text/html; charset=utf-8' });
       if (htmlUploadErr) throw new Error('HTML upload failed: ' + htmlUploadErr.message);
 
       // 5. Upload PDF — cleanup HTML on failure
