@@ -2574,7 +2574,12 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
             </div>
 
             {previewMode
-              ? <PdrReportPreview report={buildPdrReportData(selected)} />
+              ? <PdrReportPreview report={buildPdrReportData({
+                  ...selected,
+                  heroStatement:    ful.hero_statement    || selected.heroStatement,
+                  viabilitySummary: ful.viability_summary || selected.viabilitySummary,
+                  supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
+                })} />
               : <>
 
             {/* ── Section 1: Submitted Brief ───────────────────────────── */}
