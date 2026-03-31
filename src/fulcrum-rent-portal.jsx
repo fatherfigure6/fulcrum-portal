@@ -2521,21 +2521,29 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
 
     (async () => {
       try {
-        const [htmlResult, pdfResult] = await Promise.all([
+        // HTML: download bytes and create a local blob URL so the browser
+        // always renders it as text/html regardless of storage Content-Type headers
+        const [htmlDownload, pdfSigned] = await Promise.all([
           selected.reportHtmlPath
-            ? supabase.storage.from('pdr-reports').createSignedUrl(selected.reportHtmlPath, 3600)
+            ? supabase.storage.from('pdr-reports').download(selected.reportHtmlPath)
             : Promise.resolve(null),
           selected.reportPdfPath
             ? supabase.storage.from('pdr-reports').createSignedUrl(selected.reportPdfPath, 3600)
             : Promise.resolve(null),
         ]);
         if (cancelled) return;
-        if (htmlResult?.error || pdfResult?.error) {
+        if (htmlDownload?.error || pdfSigned?.error) {
           setReportGenerateError('Report links could not be loaded.');
           return;
         }
-        if (htmlResult?.data?.signedUrl) setReportHtmlUrl(htmlResult.data.signedUrl);
-        if (pdfResult?.data?.signedUrl)  setReportPdfUrl(pdfResult.data.signedUrl);
+        if (htmlDownload?.data) {
+          const text = await htmlDownload.data.text();
+          if (!cancelled) {
+            const blobUrl = URL.createObjectURL(new Blob([text], { type: 'text/html; charset=utf-8' }));
+            setReportHtmlUrl(blobUrl);
+          }
+        }
+        if (pdfSigned?.data?.signedUrl) setReportPdfUrl(pdfSigned.data.signedUrl);
       } catch {
         if (!cancelled) setReportGenerateError('Report links could not be loaded.');
       }
@@ -2578,9 +2586,21 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         throw new Error('PDF generation failed: library could not be loaded.');
       }
 
+      // Parse the full HTML document to extract just <style> + body content.
+      // Setting a complete HTML document as div innerHTML causes unreliable <style>
+      // scoping in fragment-mode parsing — extract the parts we need instead.
+      const parser = new DOMParser();
+      const parsedDoc = parser.parseFromString(htmlString, 'text/html');
+      const styleTag = parsedDoc.querySelector('style')?.outerHTML ?? '';
+      const bodyContent = parsedDoc.body?.innerHTML ?? '';
+      if (!bodyContent.trim()) throw new Error('Could not render report HTML.');
+
       container = document.createElement('div');
-      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;';
-      container.innerHTML = htmlString;
+      // position:absolute instead of position:fixed — avoids html2canvas blank-capture bug.
+      // Explicit white background so html2canvas does not see a transparent layer.
+      // Do NOT use display:none or visibility:hidden — html2canvas fails on non-rendered elements.
+      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;background:#fff;';
+      container.innerHTML = styleTag + bodyContent;
       document.body.appendChild(container);
 
       let pdfBlob;
@@ -2589,7 +2609,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
           .set({
             margin: 0,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
+            html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           })
           .from(container)
@@ -2598,7 +2618,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         throw new Error('Could not generate PDF.');
       }
 
-      if (!pdfBlob || !(pdfBlob instanceof Blob)) throw new Error('Could not generate PDF.');
+      if (!pdfBlob || !(pdfBlob instanceof Blob) || pdfBlob.size === 0) throw new Error('Could not generate PDF.');
 
       // 4. Upload HTML
       const htmlPath = `pdr/${selected.id}/report.html`;
@@ -2627,23 +2647,23 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         throw new Error('Report paths not saved: ' + dbErr.message);
       }
 
-      // 7. Generate signed URLs — non-fatal
-      const [htmlSigned, pdfSigned] = await Promise.all([
-        supabase.storage.from('pdr-reports').createSignedUrl(htmlPath, 3600),
-        supabase.storage.from('pdr-reports').createSignedUrl(pdfPath, 3600),
-      ]);
-      if (htmlSigned.error || pdfSigned.error) {
-        setReportGenerateError('Report saved but access links could not be generated.');
-      } else {
-        if (htmlSigned.data?.signedUrl) setReportHtmlUrl(htmlSigned.data.signedUrl);
-        if (pdfSigned.data?.signedUrl)  setReportPdfUrl(pdfSigned.data.signedUrl);
+      // 7. HTML: create local blob URL (bypasses Supabase storage Content-Type headers)
+      //    PDF: signed URL (PDF viewer handles it correctly regardless of headers)
+      const htmlBlobUrl = URL.createObjectURL(new Blob([htmlString], { type: 'text/html; charset=utf-8' }));
+      setReportHtmlUrl(htmlBlobUrl);
+
+      const pdfSigned = await supabase.storage.from('pdr-reports').createSignedUrl(pdfPath, 3600);
+      if (pdfSigned.error) {
+        setReportGenerateError('Report saved but PDF link could not be generated.');
+      } else if (pdfSigned.data?.signedUrl) {
+        setReportPdfUrl(pdfSigned.data.signedUrl);
       }
 
       onRefresh();
     } catch (err) {
       setReportGenerateError(err.message || 'Report generation failed.');
     } finally {
-      if (container) { try { document.body.removeChild(container); } catch { /* already removed */ } }
+      if (container && container.parentNode) container.parentNode.removeChild(container);
       setReportGenerating(false);
     }
   };
