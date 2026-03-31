@@ -2588,34 +2588,38 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         throw new Error('PDF generation failed: library could not be loaded.');
       }
 
-      // Parse the full HTML document to extract just <style> + body content.
-      // Setting a complete HTML document as div innerHTML causes unreliable <style>
-      // scoping in fragment-mode parsing — extract the parts we need instead.
-      const parser = new DOMParser();
-      const parsedDoc = parser.parseFromString(htmlString, 'text/html');
-      const styleTag = parsedDoc.querySelector('style')?.outerHTML ?? '';
-      const bodyContent = parsedDoc.body?.innerHTML ?? '';
-      if (!bodyContent.trim()) throw new Error('Could not render report HTML.');
-
-      container = document.createElement('div');
-      // Off-screen but renderable — position:absolute is the lower-risk positioning mode for this test pass.
-      // Do NOT use display:none, visibility:hidden, or opacity:0 — html2canvas skips non-rendered elements.
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;background:#fff;pointer-events:none;';
-      container.innerHTML = styleTag + bodyContent;
+      // Load the full HTML document into a hidden iframe via srcdoc.
+      // This is the same rendering path as opening the blob URL in a browser tab,
+      // which is confirmed to render correctly. html2canvas then captures the
+      // iframe body from a fully-rendered document.
+      // Start off-screen — being attached and renderable matters.
+      // Do NOT use display:none or visibility:hidden.
+      container = document.createElement('iframe');
+      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;height:800px;border:none;pointer-events:none;background:#fff;';
       document.body.appendChild(container);
 
-      // Wait for the browser to complete layout and paint before html2canvas captures the container.
-      // html2canvas can return a blank canvas if called before the element is painted.
+      // Wait for the iframe document to load
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('PDF render timed out.')), 15000);
+        container.onload = () => { clearTimeout(timeout); resolve(); };
+        container.srcdoc = htmlString;
+      });
+
+      // Wait for paint cycles to complete after load
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-      // Sanity check: container must have measurable dimensions before capture.
-      // offsetWidth/offsetHeight give layout dimensions; getBoundingClientRect provides a second signal.
-      const containerW = container.offsetWidth;
-      const containerH = container.offsetHeight;
-      const containerRect = container.getBoundingClientRect();
-      if (!containerW || !containerH || !containerRect.width || !containerRect.height) {
+      // Guard: verify the iframe document is accessible and has real content
+      const iframeDoc = container.contentDocument;
+      const iframeBody = iframeDoc?.body;
+      if (!iframeBody || iframeBody.innerHTML.trim().length < 100) {
         throw new Error('Could not render report HTML.');
       }
+
+      // Expand iframe to full content height so html2canvas captures the whole page
+      const contentHeight = iframeBody.scrollHeight;
+      if (!contentHeight) throw new Error('Could not render report HTML.');
+      container.style.height = contentHeight + 'px';
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
       let pdfBlob;
       try {
@@ -2626,7 +2630,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
             html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           })
-          .from(container)
+          .from(iframeBody)
           .outputPdf('blob');
       } catch {
         throw new Error('Could not generate PDF.');
