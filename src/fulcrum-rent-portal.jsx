@@ -2621,16 +2621,34 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       container.style.height = contentHeight + 'px';
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
+      // Move iframe on-screen behind app UI before capture.
+      // Backgrounds and gradients may not paint for elements at large negative offsets.
+      // z-index:-1 keeps it behind the loading overlay — no visible flash to the user.
+      container.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:' + contentHeight + 'px;border:none;pointer-events:none;z-index:-1;background:#fff;';
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      // Guard: verify document root is accessible before capture
+      if (!iframeDoc || !iframeDoc.documentElement) {
+        throw new Error('Could not render report HTML.');
+      }
+
       let pdfBlob;
       try {
         pdfBlob = await html2pdfLib()
           .set({
             margin: 0,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, logging: false },
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              windowWidth: 1100,
+              scrollX: 0,
+              scrollY: 0,
+            },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           })
-          .from(iframeBody)
+          .from(iframeDoc.documentElement)
           .outputPdf('blob');
       } catch {
         throw new Error('Could not generate PDF.');
