@@ -2572,7 +2572,9 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       if (!report) throw new Error('Could not build report data.');
 
       // 2. Render HTML string — single source for both HTML file and PDF
-      const logoUrl = window.location.origin + '/No BG, Light Text.png';
+      // encodeURIComponent so spaces/commas in the filename are valid in fetch() calls
+      // made by html2canvas (useCORS). A 404 on an image with useCORS can blank the entire canvas.
+      const logoUrl = window.location.origin + '/' + encodeURIComponent('No BG, Light Text.png');
       const htmlString = renderPdrReportHtml(report, { logoUrl });
       if (!htmlString || typeof htmlString !== 'string' || htmlString.trim().length < 100) {
         throw new Error('Could not render report HTML.');
