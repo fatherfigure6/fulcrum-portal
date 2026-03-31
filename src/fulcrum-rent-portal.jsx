@@ -30,10 +30,13 @@ const store = {
 
 // ── Request service layer ─────────────────────────────────────────────────────
 function normaliseRequest(row) {
-  const rent     = row.request_rent_details?.[0]     ?? {};
-  const cma      = row.request_cma_details?.[0]      ?? {};
-  const referral = row.request_referral_details?.[0] ?? {};
-  const pdr      = row.request_pdr_details?.[0]      ?? {};
+  // Supabase returns UNIQUE-FK relations as a single object, not an array.
+  // Guard against both shapes so loadRequests works regardless of PostgREST version.
+  const unwrap = v => (Array.isArray(v) ? v[0] : v) ?? {};
+  const rent     = unwrap(row.request_rent_details);
+  const cma      = unwrap(row.request_cma_details);
+  const referral = unwrap(row.request_referral_details);
+  const pdr      = unwrap(row.request_pdr_details);
   return {
     id:            row.id,
     type:          row.request_type,
