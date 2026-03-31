@@ -4,7 +4,7 @@
     { "source": "/(.*)", "destination": "/" }
   ],
   "functions": {
-    "api/render-pdr-pdf.cjs": {
+    "api/render-pdr-pdf.js": {
       "maxDuration": 60
     }
   }
