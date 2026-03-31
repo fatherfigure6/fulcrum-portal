@@ -61,11 +61,19 @@ html,body,#root { height:100%; background:var(--grey-100); color:var(--ink); fon
 .badge { display:inline-block; padding:2px 8px; border-radius:2px; font-size:11px; font-weight:600; letter-spacing:.3px; text-transform:uppercase; }
 .badge-pending  { background:#f5e8e8; color:#8b2020; }
 .badge-complete { background:#e4ede8; color:#2a5c3a; }
-.badge-approved { background:#e4eaf5; color:#2a3d70; }
+.badge-approved    { background:#e4eaf5; color:#2a3d70; }
+.badge-in-review   { background:#fef3e2; color:#7a4a00; }
+.badge-in-progress { background:#e8f0fe; color:#1a3a8a; }
+.badge-cancelled   { background:#f0f0f0; color:#666;    }
 .badge-rent     { background:#edf0f5; color:var(--primary); }
 .badge-cma      { background:#e4eef0; color:#1a5a65; }
 .badge-pdr      { background:#eaecf5; color:#3a4a80; }
 .badge-referral { background:#fef3e2; color:#7a4a00; }
+/* PDR fulfilment UI */
+.pdr-section-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#aaa; margin-bottom:12px; }
+.strategy-card { border:1px solid var(--border-strong); border-radius:8px; padding:16px; margin-bottom:12px; }
+.strategy-card-new { border-style:dashed; }
+.strategy-card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
 .btn-purple   { background:var(--indigo); color:#fff; border-color:var(--indigo); }
 .btn-purple:hover { background:#3a4a7a; border-color:#3a4a7a; }
 .pill-group { display:flex; flex-wrap:wrap; gap:8px; margin-top:4px; }

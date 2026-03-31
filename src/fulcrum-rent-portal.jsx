@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, createContext, useContext, us
 import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
 import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Outlet } from "react-router-dom";
+import buildPdrReportData from './utils/buildPdrReportData';
+import PdrReportPreview   from './components/PdrReportPreview';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -26,6 +28,111 @@ const store = {
   }
 };
 
+// ── Request service layer ─────────────────────────────────────────────────────
+function normaliseRequest(row) {
+  const rent     = row.request_rent_details?.[0]     ?? {};
+  const cma      = row.request_cma_details?.[0]      ?? {};
+  const referral = row.request_referral_details?.[0] ?? {};
+  const pdr      = row.request_pdr_details?.[0]      ?? {};
+  return {
+    id:            row.id,
+    type:          row.request_type,
+    request_type:  row.request_type,
+    status:        row.status,
+    source:        row.source,
+    brokerId:      row.broker_id,
+    brokerName:    row.broker_name,
+    brokerEmail:   row.broker_email,
+    brokerCompany: row.broker_company,
+    clientName:    row.client_name,
+    clientEmail:   row.client_email,
+    clientMobile:  row.client_mobile,
+    internalNotes: row.internal_notes,
+    downloadUrl:   row.download_url,
+    createdAt:     row.created_at    ? new Date(row.created_at).getTime()    : null,
+    completedAt:   row.completed_at  ? new Date(row.completed_at).getTime()  : null,
+    // Rent detail
+    address:       rent.address      ?? cma.address,
+    weeklyRent:    rent.weekly_rent,
+    // CMA detail
+    expectedValue: cma.expected_value,
+    // Referral detail
+    situation:     referral.situation,
+    staffNotes:    referral.staff_notes,
+    // PDR intake
+    budgetMin:     pdr.budget_min,
+    budgetMax:     pdr.budget_max,
+    propertyTypes: pdr.property_types ?? [],
+    bedrooms:      pdr.bedrooms,
+    bathrooms:     pdr.bathrooms,
+    locations:     pdr.locations,
+    purpose:       pdr.purpose,
+    rentalYield:   pdr.rental_yield,
+    notes:         pdr.notes ?? rent.notes ?? cma.notes,
+    // PDR fulfilment
+    heroStatement:    pdr.hero_statement,
+    viabilitySummary: pdr.viability_summary,
+    supportingNotes:  pdr.supporting_notes,
+    salesCsvFilePath: pdr.sales_csv_file_path,
+    reportPdfPath:    pdr.report_pdf_path,
+    reportHtmlPath:   pdr.report_html_path,
+    // Strategies (sorted by sort_order)
+    strategies: (row.pdr_strategies ?? []).sort((a, b) => a.sort_order - b.sort_order),
+  };
+}
+
+async function loadRequests() {
+  const { data, error } = await supabase
+    .from('requests')
+    .select(`
+      *,
+      request_rent_details(*),
+      request_cma_details(*),
+      request_referral_details(*),
+      request_pdr_details(*),
+      pdr_strategies(*)
+    `)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(normaliseRequest);
+}
+
+
+// ── PDR service helpers ───────────────────────────────────────────────────────
+async function updatePdrDetails(requestId, patch) {
+  const { error } = await supabase.from('request_pdr_details').update(patch).eq('request_id', requestId);
+  if (error) throw error;
+}
+async function addStrategy(requestId, data) {
+  const { error } = await supabase.from('pdr_strategies').insert({ request_id: requestId, ...data });
+  if (error) throw error;
+}
+async function updateStrategy(strategyId, patch) {
+  const { error } = await supabase.from('pdr_strategies').update(patch).eq('id', strategyId);
+  if (error) throw error;
+}
+async function deleteStrategy(strategyId) {
+  const { error } = await supabase.from('pdr_strategies').delete().eq('id', strategyId);
+  if (error) throw error;
+}
+async function reorderStrategies(orderedIds) {
+  await Promise.all(orderedIds.map((id, i) => supabase.from('pdr_strategies').update({ sort_order: i }).eq('id', id)));
+}
+
+// ── Strategy type definitions ─────────────────────────────────────────────────
+const STRATEGY_TYPES = [
+  { value: 'value_creation',         label: 'Value Creation Strategy'       },
+  { value: 'capital_adjustment',     label: 'Capital Adjustment Strategy'   },
+  { value: 'location_expansion',     label: 'Location Expansion Strategy'   },
+  { value: 'property_configuration', label: 'Property Configuration Strategy' },
+  { value: 'subdivision',            label: 'Subdivision Strategy'          },
+  { value: 'ancillary_dwelling',     label: 'Ancillary Dwelling Strategy'   },
+];
+const STRATEGY_LABEL = Object.fromEntries(STRATEGY_TYPES.map(t => [t.value, t.label]));
+const BLANK_STRAT = {
+  strategy_type: 'value_creation', headline: '', summary: '',
+  target_purchase_price: '', budget_amount: '', projected_end_value: '', supporting_notes: '',
+};
 
 // ── EmailJS ───────────────────────────────────────────────────────────────────
 const EMAILJS_SERVICE_ID     = import.meta.env.VITE_EMAILJS_SERVICE_ID;
@@ -115,7 +222,7 @@ const ROUTES = [
   { path: "/dashboard",     label: "Dashboard",         crumbParent: null },
   { path: "/rent-requests", label: "Rent Requests",     crumbParent: "/dashboard" },
   { path: "/cma-requests",  label: "CMA Requests",      crumbParent: "/dashboard" },
-  { path: "/pdr-reports",   label: "PDR Reports",       crumbParent: "/dashboard" },
+  { path: "/pdr-reports",   label: "PD Reports",        crumbParent: "/dashboard" },
   { path: "/referrals",     label: "Referrals",         crumbParent: "/dashboard" },
   { path: "/brokers",       label: "Broker Management", crumbParent: "/dashboard" },
   { path: "/staff",         label: "Staff Accounts",    crumbParent: "/dashboard" },
@@ -342,12 +449,9 @@ export default function App() {
       void resolveAuth(authSession);
     });
 
-    (async () => {
-      let r = await store.get("fa:requests");
-      if (r === null) { r = []; await store.set("fa:requests", r); }
-      else if (!r) r = [];
-      if (mounted) setRequests(r);
-    })();
+    loadRequests()
+      .then(r => { if (mounted) setRequests(r); })
+      .catch(err => { console.error("[loadRequests] failed:", err); if (mounted) setRequests([]); });
 
     window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); setInstallPrompt(e); setShowInstall(true); });
 
@@ -361,8 +465,6 @@ export default function App() {
     const timeout = setTimeout(() => { setIsLoading(v => v ? false : v); }, 3000);
     return () => clearTimeout(timeout);
   }, []);
-
-  const saveRequests = async r => { setRequests(r); await store.set("fa:requests", r); };
 
   const login = async (email, password) => {
     try {
@@ -540,8 +642,44 @@ export default function App() {
   };
 
   const submitRequest = async data => {
-    const req = { ...data, id: uid(), brokerId: session.id, brokerName: session.name, brokerEmail: session.email, brokerCompany: session.company, status: "pending", createdAt: Date.now(), completedAt: null, downloadUrl: null };
-    await saveRequests([req, ...requests]);
+    let rpcResult;
+    if (data.type === "rent") {
+      rpcResult = await supabase.rpc("create_rent_request", {
+        p_address:     data.address,
+        p_weekly_rent: String(data.weeklyRent ?? ""),
+        p_notes:       data.notes || "",
+      });
+    } else if (data.type === "cma") {
+      rpcResult = await supabase.rpc("create_cma_request", {
+        p_address:        data.address,
+        p_expected_value: String(data.expectedValue ?? ""),
+        p_notes:          data.notes || "",
+      });
+    } else if (data.type === "referral") {
+      rpcResult = await supabase.rpc("create_referral_request", {
+        p_client_name:   data.clientName,
+        p_client_email:  data.clientEmail,
+        p_client_mobile: data.clientMobile || "",
+        p_situation:     data.situation || "",
+      });
+    } else if (data.type === "pdr") {
+      rpcResult = await supabase.rpc("create_pdr_request", {
+        p_client_name:    data.clientName,
+        p_client_email:   data.clientEmail,
+        p_client_mobile:  data.clientMobile || "",
+        p_budget_min:     String(data.budgetMin ?? ""),
+        p_budget_max:     String(data.budgetMax ?? ""),
+        p_property_types: data.propertyTypes || [],
+        p_bedrooms:       data.bedrooms || "",
+        p_bathrooms:      data.bathrooms || "",
+        p_locations:      data.locations || "",
+        p_purpose:        data.purpose || "",
+        p_rental_yield:   String(data.rentalYield ?? ""),
+        p_notes:          data.notes || "",
+      });
+    }
+    if (rpcResult?.error) throw rpcResult.error;
+
     const typeLabel = data.type === "rent" ? "Rent Letter" : data.type === "cma" ? "CMA" : data.type === "referral" ? "Client Referral" : "PDR";
     const message = data.type === "referral"
       ? `A new client referral has been submitted.\n\nReferring Broker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\n\nClient Name: ${data.clientName}\nClient Email: ${data.clientEmail}\nClient Mobile: ${data.clientMobile || "—"}\n\nSituation:\n${data.situation}\n\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review this referral.`
@@ -552,11 +690,33 @@ export default function App() {
       message
     });
     sendWhatsApp(`New ${typeLabel}\nFrom: ${session.name} (${session.company})\n${data.type === "referral" ? `Client: ${data.clientName}` : `Property: ${data.address || "—"}`}`);
-    return req;
+    loadRequests().then(setRequests).catch(console.error);
+    return { id: rpcResult?.data };
   };
 
-  const updateRequest = async (id, patch) => saveRequests(requests.map(r => r.id === id ? { ...r, ...patch } : r));
-  const deleteRequest = async (id, type) => { await saveRequests(requests.filter(r => !(r.id === id && r.type === type))); };
+  const refreshRequests = () => loadRequests().then(setRequests).catch(console.error);
+
+  const updateRequest = async (id, patch) => {
+    const dbPatch = {};
+    if (patch.status       !== undefined) dbPatch.status        = patch.status;
+    if (patch.downloadUrl  !== undefined) dbPatch.download_url  = patch.downloadUrl;
+    if (patch.completedAt  !== undefined) dbPatch.completed_at  = patch.completedAt ? new Date(patch.completedAt).toISOString() : null;
+    if (patch.internalNotes !== undefined) dbPatch.internal_notes = patch.internalNotes;
+    if (Object.keys(dbPatch).length > 0) {
+      const { error } = await supabase.from("requests").update(dbPatch).eq("id", id);
+      if (error) throw error;
+    }
+    if (patch.staffNotes !== undefined) {
+      const { error } = await supabase.from("request_referral_details").update({ staff_notes: patch.staffNotes }).eq("request_id", id);
+      if (error) throw error;
+    }
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+  };
+  const deleteRequest = async (id) => {
+    const { error } = await supabase.from("requests").delete().eq("id", id);
+    if (error) throw error;
+    setRequests(prev => prev.filter(r => r.id !== id));
+  };
 
   const myRequests   = useMemo(() => requests.filter(r => r.brokerId === session?.id), [requests, session?.id]);
   const rentReqs     = useMemo(() => requests.filter(r => r.type === "rent"),           [requests]);
@@ -610,7 +770,7 @@ export default function App() {
           } />
           <Route path="pdr-reports" element={
             session?.role === "staff"
-              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} onDelete={deleteRequest} />
+              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} onDelete={deleteRequest} onRefresh={refreshRequests} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="referrals" element={
@@ -889,7 +1049,7 @@ function AppShell({ session, onLogout, requests, users }) {
     { section:"Market Analysis" },
     { path:"/cma-requests",  icon:"🏡", label:"CMA Requests",  badge:pendingCMA  },
     { section:"Price Discovery" },
-    { path:"/pdr-reports",   icon:"🔍", label:"PDR Reports",   badge:pendingPDR },
+    { path:"/pdr-reports",   icon:"🔍", label:"PD Reports",    badge:pendingPDR },
     { section:"Referrals" },
     { path:"/referrals",     icon:"🤝", label:"Referrals",     badge:pendingReferrals },
     { section:"Admin" },
@@ -1831,7 +1991,7 @@ function BrokerRequests({ requests }) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function StatusBadge({ s }) {
-  const map = { pending:["badge-pending","Pending"], complete:["badge-complete","Complete"], approved:["badge-approved","Approved"] };
+  const map = { pending:["badge-pending","Pending"], complete:["badge-complete","Complete"], approved:["badge-approved","Approved"], in_review:["badge-in-review","In Review"], in_progress:["badge-in-progress","In Progress"], cancelled:["badge-cancelled","Cancelled"] };
   const [cls, label] = map[s] || ["badge-pending", s];
   return <span className={`badge ${cls}`}>{label}</span>;
 }
@@ -1890,12 +2050,22 @@ export function PDRPublicForm() {
   const submit = async () => {
     const e = validate(); if(e){setErr(e);return;}
     try {
-      const all = await store.get("fa:requests") || [];
-      const req = {
-        ...form, type:"pdr", id:uid(), brokerId, brokerName:"", brokerEmail:"", brokerCompany:"",
-        status:"pending", createdAt:Date.now(), completedAt:null, downloadUrl:null
-      };
-      await store.set("fa:requests", [req, ...all]);
+      const { error } = await supabase.rpc("create_pdr_public", {
+        p_broker_id:      brokerId || null,
+        p_client_name:    form.clientName,
+        p_client_email:   form.clientEmail,
+        p_client_mobile:  form.clientMobile || "",
+        p_budget_min:     String(form.budgetMin ?? ""),
+        p_budget_max:     String(form.budgetMax ?? ""),
+        p_property_types: form.propertyTypes || [],
+        p_bedrooms:       form.bedrooms || "",
+        p_bathrooms:      form.bathrooms || "",
+        p_locations:      form.locations || "",
+        p_purpose:        form.purpose || "",
+        p_rental_yield:   String(form.rentalYield ?? ""),
+        p_notes:          form.notes || "",
+      });
+      if (error) throw error;
       sendEmail(EMAILJS_TEMPLATE_STAFF, {
         email: "brian@fulcrumaustralia.com.au",
         subject: `New PDR Submission — ${form.clientName}`,
@@ -2195,70 +2365,174 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
 }
 
 // ── Admin PDR Requests ────────────────────────────────────────────────────────
-function AdminPDRRequests({ requests, onUpdate, onDelete }) {
-  const [selected,  setSelected]  = useState(null);
-  const [filter,    setFilter]    = useState("all");
-  const [uploadUrl, setUploadUrl] = useState("");
-  const [notifSent, setNotifSent] = useState(false);
-  const filtered = filter==="all" ? requests : requests.filter(r=>r.status===filter);
+function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
+  const [selected,    setSelected]    = useState(null);
+  const [filter,      setFilter]      = useState("all");
+  const [previewMode, setPreviewMode] = useState(false);
+  const filtered = filter === "all" ? requests : requests.filter(r => r.status === filter);
 
-  const markComplete = async req => {
-    if (!uploadUrl.trim()) return alert("Please enter a download URL for the completed report.");
-    await onUpdate(req.id, { status:"complete", completedAt:Date.now(), downloadUrl:uploadUrl.trim() });
-    sendEmail(EMAILJS_TEMPLATE_USER, {
-      to_email: req.clientEmail,
-      subject: `Your Price Discovery Report is Ready — ${req.address || "Property"}`,
-      message: `Hi ${req.clientName},\n\nYour Price Discovery Report has been completed by the Fulcrum Australia team.\n\nProperty: ${req.address || "—"}\nCompleted: ${new Date().toLocaleString("en-AU")}\n\nAccess your report here:\n${uploadUrl.trim()}\n\nRegards,\nFulcrum Australia`
-    });
-    setNotifSent(true);
-    setTimeout(()=>{ setSelected(null); setUploadUrl(""); setNotifSent(false); }, 2000);
+  // Keep selected fresh after parent state refreshes
+  useEffect(() => {
+    if (selected) {
+      const fresh = requests.find(r => r.id === selected.id);
+      if (fresh) setSelected(fresh);
+    }
+  }, [requests]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Fulfilment fields ─────────────────────────────────────────────────────
+  const [ful,        setFul]        = useState({ hero_statement: '', viability_summary: '', supporting_notes: '' });
+  const [fulSaving,  setFulSaving]  = useState(false);
+  const [fulMsg,     setFulMsg]     = useState('');
+  useEffect(() => {
+    if (selected?.id) {
+      setFul({
+        hero_statement:    selected.heroStatement    || '',
+        viability_summary: selected.viabilitySummary || '',
+        supporting_notes:  selected.supportingNotes  || '',
+      });
+      setFulMsg('');
+    }
+  }, [selected?.id]);
+
+  const saveFulfilment = async () => {
+    setFulSaving(true); setFulMsg('');
+    try {
+      await updatePdrDetails(selected.id, ful);
+      await onRefresh();
+      setFulMsg('saved');
+    } catch { setFulMsg('error'); }
+    setFulSaving(false);
   };
 
+  // ── Strategy state ────────────────────────────────────────────────────────
+  const [stratEdits,  setStratEdits]  = useState({});
+  const [stratSaving, setStratSaving] = useState(null);
+  const [stratMsg,    setStratMsg]    = useState({});
+  const [addingStrat, setAddingStrat] = useState(false);
+  const [newStrat,    setNewStrat]    = useState(BLANK_STRAT);
+  const [addSaving,   setAddSaving]   = useState(false);
+
+  useEffect(() => {
+    if (!selected) return;
+    const edits = {};
+    (selected.strategies || []).forEach(s => {
+      edits[s.id] = {
+        headline:             s.headline             || '',
+        summary:              s.summary              || '',
+        target_purchase_price: s.target_purchase_price != null ? String(s.target_purchase_price) : '',
+        budget_amount:         s.budget_amount         != null ? String(s.budget_amount)         : '',
+        projected_end_value:   s.projected_end_value   != null ? String(s.projected_end_value)   : '',
+        supporting_notes:      s.supporting_notes      || '',
+      };
+    });
+    setStratEdits(edits);
+    setStratMsg({});
+  }, [selected]);
+
+  const setStratField = (id, k, v) => setStratEdits(prev => ({ ...prev, [id]: { ...prev[id], [k]: v } }));
+  const toNum = v => (v === '' || v == null) ? null : Number(v);
+
+  const saveStrategy = async s => {
+    const e = stratEdits[s.id] || {};
+    setStratSaving(s.id);
+    try {
+      await updateStrategy(s.id, {
+        headline:              e.headline              || null,
+        summary:               e.summary               || null,
+        target_purchase_price: toNum(e.target_purchase_price),
+        budget_amount:         toNum(e.budget_amount),
+        projected_end_value:   toNum(e.projected_end_value),
+        supporting_notes:      e.supporting_notes      || null,
+      });
+      await onRefresh();
+      setStratMsg(prev => ({ ...prev, [s.id]: 'saved' }));
+    } catch { setStratMsg(prev => ({ ...prev, [s.id]: 'error' })); }
+    setStratSaving(null);
+  };
+
+  const handleDeleteStrategy = async id => {
+    if (!window.confirm('Remove this strategy?')) return;
+    await deleteStrategy(id);
+    await onRefresh();
+  };
+
+  const handleMoveStrategy = async (idx, dir) => {
+    const strats = [...(selected.strategies || [])];
+    const swap = dir === 'up' ? idx - 1 : idx + 1;
+    if (swap < 0 || swap >= strats.length) return;
+    [strats[idx], strats[swap]] = [strats[swap], strats[idx]];
+    await reorderStrategies(strats.map(s => s.id));
+    onRefresh();
+  };
+
+  const handleAddStrategy = async () => {
+    setAddSaving(true);
+    try {
+      await addStrategy(selected.id, {
+        strategy_type:         newStrat.strategy_type,
+        headline:              newStrat.headline              || null,
+        summary:               newStrat.summary               || null,
+        target_purchase_price: toNum(newStrat.target_purchase_price),
+        budget_amount:         toNum(newStrat.budget_amount),
+        projected_end_value:   toNum(newStrat.projected_end_value),
+        supporting_notes:      newStrat.supporting_notes      || null,
+        sort_order:            (selected.strategies || []).length,
+      });
+      await onRefresh();
+      setNewStrat(BLANK_STRAT);
+      setAddingStrat(false);
+    } catch { alert('Failed to add strategy. Please try again.'); }
+    setAddSaving(false);
+  };
+
+  const openRequest = r => { setSelected(r); setAddingStrat(false); setNewStrat(BLANK_STRAT); setPreviewMode(false); };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
       <div className="page-header">
         <div className="page-title">Price Discovery Reports</div>
-        <div className="page-sub">Review client purchasing parameters and upload completed reports</div>
+        <div className="page-sub">Review submitted briefs, add staff positioning, and manage strategic pathways</div>
       </div>
       <div className="card">
-        <div className="row" style={{marginBottom:20,gap:8}}>
-          {["all","pending","complete"].map(f=>(
-            <button key={f} className={`btn ${filter===f?"btn-purple":"btn-secondary"} btn-sm`} onClick={()=>setFilter(f)} style={{textTransform:"capitalize"}}>{f}</button>
+        <div className="row" style={{marginBottom:20,gap:8,flexWrap:"wrap"}}>
+          {["all","pending","in_review","in_progress","complete","cancelled"].map(f => (
+            <button key={f} className={`btn ${filter===f?"btn-purple":"btn-secondary"} btn-sm`}
+              onClick={()=>setFilter(f)} style={{textTransform:"capitalize",whiteSpace:"nowrap"}}>
+              {f === "all" ? "All" : f.replace("_", " ")}
+            </button>
           ))}
         </div>
         <div className="req-table-wrap">
-        <table className="tbl">
-          <thead><tr><th>Client</th><th>Broker</th><th>Budget</th><th>Purpose</th><th>Types</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
-          <tbody>
-            {filtered.map(r=>(
-              <tr key={r.id}>
-                <td><strong>{r.clientName}</strong><br/><span style={{fontSize:12,color:"#aaa"}}>{r.clientEmail}</span></td>
-                <td style={{fontSize:13,color:"#888"}}>{r.brokerName||<span style={{color:"#ccc"}}>Direct</span>}</td>
-                <td><span className="tag">{r.budgetMin?fmtMoney(r.budgetMin)+" – ":""}{fmtMoney(r.budgetMax)}</span></td>
-                <td><span className={`badge ${r.purpose==="investor"?"badge-cma":"badge-approved"}`}>{r.purpose==="investor"?"📈 Investor":"🏠 Owner"}</span></td>
-                <td style={{fontSize:12,color:"#888",maxWidth:140}}>{(r.propertyTypes||[]).join(", ")||"—"}</td>
-                <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
-                <td><StatusBadge s={r.status} /></td>
-                <td><button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setUploadUrl(r.downloadUrl||""); }}>Review</button></td>
-              </tr>
-            ))}
-            {filtered.length===0 && <tr><td colSpan={8}><div className="empty"><div className="empty-icon">🔍</div>No PDR requests yet</div></td></tr>}
-          </tbody>
-        </table>
+          <table className="tbl">
+            <thead><tr><th>Client</th><th>Broker</th><th>Budget</th><th>Purpose</th><th>Submitted</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              {filtered.map(r => (
+                <tr key={r.id}>
+                  <td><strong>{r.clientName}</strong><br/><span style={{fontSize:12,color:"#aaa"}}>{r.clientEmail}</span></td>
+                  <td style={{fontSize:13,color:"#888"}}>{r.brokerName||<span style={{color:"#ccc"}}>Direct</span>}</td>
+                  <td><span className="tag">{r.budgetMin?fmtMoney(r.budgetMin)+" – ":""}{fmtMoney(r.budgetMax)}</span></td>
+                  <td><span className={`badge ${r.purpose==="investor"?"badge-cma":"badge-approved"}`}>{r.purpose==="investor"?"📈 Investor":"🏠 Owner"}</span></td>
+                  <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
+                  <td><StatusBadge s={r.status} /></td>
+                  <td><button className="btn btn-purple btn-sm" onClick={()=>openRequest(r)}>Open →</button></td>
+                </tr>
+              ))}
+              {filtered.length===0 && <tr><td colSpan={7}><div className="empty"><div className="empty-icon">🔍</div>No PDR requests found</div></td></tr>}
+            </tbody>
+          </table>
         </div>
         <div className="req-cards">
-          {filtered.map(r=>(
+          {filtered.map(r => (
             <div key={r.id} className="req-card">
               <div className="req-card-name">{r.clientName}</div>
               <div className="req-card-sub">{r.clientEmail}</div>
-              <div className="req-card-sub">{r.brokerName?`Via ${r.brokerName}`:"Direct submission"}</div>
-              <div className="req-card-sub">
-                {r.budgetMin?`${fmtMoney(r.budgetMin)} – `:""}{fmtMoney(r.budgetMax)}
-              </div>
+              <div className="req-card-sub">{r.brokerName ? `Via ${r.brokerName}` : "Direct submission"}</div>
+              <div className="req-card-sub">{r.budgetMin?`${fmtMoney(r.budgetMin)} – `:""}{fmtMoney(r.budgetMax)}</div>
               <div className="req-card-date">{fmt(r.createdAt)}</div>
               <StatusBadge s={r.status} />
               <div className="req-card-actions">
-                <button className="btn btn-secondary btn-sm" onClick={()=>{ setSelected(r); setUploadUrl(r.downloadUrl||""); }}>Review →</button>
+                <button className="btn btn-purple btn-sm" onClick={()=>openRequest(r)}>Open →</button>
               </div>
             </div>
           ))}
@@ -2267,42 +2541,254 @@ function AdminPDRRequests({ requests, onUpdate, onDelete }) {
       </div>
 
       {selected && (
-        <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSelected(null)}>
-          <div className="modal" style={{maxWidth:600}}>
-            <div className="modal-title">Price Discovery — {selected.clientName}</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"10px 24px",marginBottom:20}}>
-              <Detail label="Client Name"  val={selected.clientName} />
-              <Detail label="Mobile"       val={selected.clientMobile||"—"} />
-              <Detail label="Email"        val={selected.clientEmail} />
-              <Detail label="Submitted"    val={fmt(selected.createdAt)} />
-              <Detail label="Purpose"      val={selected.purpose==="investor"?"📈 Investor":"🏠 Owner-Occupier"} />
-              <Detail label="Budget"       val={`${selected.budgetMin?fmtMoney(selected.budgetMin)+" – ":""}${fmtMoney(selected.budgetMax)}`} />
-              {selected.purpose==="investor"&&selected.rentalYield && <Detail label="Yield Target" val={`${selected.rentalYield}% p.a.`} />}
-              <Detail label="Property Types" val={(selected.propertyTypes||[]).join(", ")||"—"} />
-              <Detail label="Bedrooms"     val={selected.bedrooms||"Any"} />
-              <Detail label="Bathrooms"    val={selected.bathrooms||"Any"} />
-              <Detail label="Preferred Suburbs" val={selected.locations||"—"} full />
-              {selected.notes && <Detail label="Notes" val={selected.notes} full />}
+        <div className="overlay" onClick={e => e.target===e.currentTarget && setSelected(null)}>
+          <div className="modal" style={{maxWidth:860,width:"95vw",overflowY:"auto",maxHeight:"90vh"}}>
+
+            {/* Header */}
+            <div className="row-between" style={{marginBottom:20}}>
+              <div>
+                <div className="modal-title" style={{marginBottom:4}}>Price Discovery Report</div>
+                <div style={{fontSize:13,color:"#888"}}>{selected.clientName} · {fmt(selected.createdAt)}</div>
+              </div>
+              <div className="row" style={{gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <StatusBadge s={selected.status} />
+                <select
+                  value={selected.status}
+                  onChange={async e => { await onUpdate(selected.id, { status: e.target.value }); onRefresh(); }}
+                  style={{fontSize:12,padding:"4px 8px",border:"1px solid var(--border-strong)",borderRadius:4,background:"var(--card)",color:"var(--text)"}}
+                >
+                  {["pending","in_review","in_progress","complete","cancelled"].map(s => (
+                    <option key={s} value={s}>{s.replace(/_/g," ")}</option>
+                  ))}
+                </select>
+                <button className="btn btn-secondary btn-sm" onClick={()=>setSelected(null)}>✕ Close</button>
+              </div>
             </div>
-            <div className="divider" />
-            {notifSent
-              ? <div className="alert alert-success">✅ Report uploaded! Client has been notified.</div>
+
+            {/* ── Edit / Preview toggle ───────────────────────────────── */}
+            <div className="row" style={{gap:8,marginBottom:20,borderBottom:"1px solid var(--border)",paddingBottom:16}}>
+              <button className={`btn btn-sm ${!previewMode ? 'btn-purple' : 'btn-secondary'}`}
+                onClick={() => setPreviewMode(false)}>✏️ Edit</button>
+              <button className={`btn btn-sm ${previewMode ? 'btn-purple' : 'btn-secondary'}`}
+                onClick={() => setPreviewMode(true)}>👁 Preview Report</button>
+            </div>
+
+            {previewMode
+              ? <PdrReportPreview report={buildPdrReportData(selected)} />
               : <>
-                  <div className="field">
-                    <label>Upload Completed Report URL</label>
-                    <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="https://drive.google.com/... or similar" />
-                    <div className="hint">Paste a shareable link to the completed PDF report</div>
-                  </div>
-                  <div className="row" style={{justifyContent:"space-between",gap:10}}>
-                    <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm("Delete this report? This cannot be undone.")){ onDelete(selected.id, selected.type); setSelected(null); } }}>Delete</button>
-                    <div className="row" style={{gap:10}}>
-                      <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Cancel</button>
-                      {selected.status==="pending" && <button className="btn btn-purple" onClick={()=>markComplete(selected)}>✅ Upload & Notify Client</button>}
-                      {selected.status==="complete" && <button className="btn btn-secondary" onClick={()=>markComplete(selected)}>Update Report URL</button>}
+
+            {/* ── Section 1: Submitted Brief ───────────────────────────── */}
+            <div className="pdr-section-label">Submitted Brief</div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 24px",marginBottom:16}}>
+              <Detail label="Client Name"   val={selected.clientName} />
+              <Detail label="Client Email"  val={selected.clientEmail} />
+              <Detail label="Mobile"        val={selected.clientMobile||"—"} />
+              <Detail label="Source"        val={selected.source==="public"?"Public Form":"Broker Portal"} />
+              {selected.brokerName && (
+                <Detail label="Submitted By" val={`${selected.brokerName}${selected.brokerCompany?` · ${selected.brokerCompany}`:""}`} />
+              )}
+              <Detail label="Purpose"  val={selected.purpose==="investor"?"📈 Investor":"🏠 Owner-Occupier"} />
+              <Detail label="Budget"   val={`${selected.budgetMin?fmtMoney(selected.budgetMin)+" – ":""}${fmtMoney(selected.budgetMax)}`} />
+              {selected.purpose==="investor" && selected.rentalYield && (
+                <Detail label="Yield Target" val={`${selected.rentalYield}% p.a.`} />
+              )}
+              <Detail label="Property Types" val={(selected.propertyTypes||[]).join(", ")||"—"} />
+              <Detail label="Bedrooms"   val={selected.bedrooms||"Any"} />
+              <Detail label="Bathrooms"  val={selected.bathrooms||"Any"} />
+              <Detail label="Preferred Suburbs" val={selected.locations||"—"} full />
+              {selected.notes && <Detail label="Client Notes" val={selected.notes} full />}
+            </div>
+
+            <div className="divider" />
+
+            {/* ── Section 2: Staff Positioning ─────────────────────────── */}
+            <div className="pdr-section-label">Staff Positioning</div>
+            <div className="field">
+              <label>Hero Statement</label>
+              <textarea value={ful.hero_statement} rows={3} style={{resize:"vertical"}}
+                placeholder="High-level positioning statement for this client's brief…"
+                onChange={e => setFul(f => ({...f, hero_statement: e.target.value}))} />
+            </div>
+            <div className="field">
+              <label>Viability Summary</label>
+              <textarea value={ful.viability_summary} rows={3} style={{resize:"vertical"}}
+                placeholder="Overall assessment of what's achievable within this brief…"
+                onChange={e => setFul(f => ({...f, viability_summary: e.target.value}))} />
+            </div>
+            <div className="field">
+              <label>Supporting Notes <span style={{fontWeight:400,color:"#bbb"}}>(internal)</span></label>
+              <textarea value={ful.supporting_notes} rows={2} style={{resize:"vertical"}}
+                placeholder="Research context, caveats, internal analysis…"
+                onChange={e => setFul(f => ({...f, supporting_notes: e.target.value}))} />
+            </div>
+            <div className="row" style={{justifyContent:"flex-end",alignItems:"center",gap:12,marginBottom:4}}>
+              {fulMsg==="saved" && <span style={{fontSize:12,color:"#2a5c3a"}}>✓ Saved</span>}
+              {fulMsg==="error" && <span style={{fontSize:12,color:"#8b2020"}}>Save failed — try again</span>}
+              <button className="btn btn-purple" onClick={saveFulfilment} disabled={fulSaving}>
+                {fulSaving ? "Saving…" : "Save Positioning"}
+              </button>
+            </div>
+
+            <div className="divider" />
+
+            {/* ── Section 3: Strategic Pathways ────────────────────────── */}
+            <div className="row-between" style={{marginBottom:14}}>
+              <div className="pdr-section-label" style={{marginBottom:0}}>Strategic Pathways</div>
+              {!addingStrat && (
+                <button className="btn btn-secondary btn-sm" onClick={()=>setAddingStrat(true)}>+ Add Strategy</button>
+              )}
+            </div>
+
+            {(selected.strategies||[]).length === 0 && !addingStrat && (
+              <div style={{fontSize:13,color:"#aaa",marginBottom:16,fontStyle:"italic"}}>
+                No strategies added yet. Click + Add Strategy to begin.
+              </div>
+            )}
+
+            {(selected.strategies||[]).map((s, idx) => {
+              const e    = stratEdits[s.id] || {};
+              const msg  = stratMsg[s.id];
+              const last = idx === (selected.strategies.length - 1);
+              return (
+                <div key={s.id} className="strategy-card">
+                  <div className="strategy-card-header">
+                    <div style={{fontWeight:700,fontSize:13,color:"var(--primary)"}}>
+                      {STRATEGY_LABEL[s.strategy_type] || s.strategy_type}
+                    </div>
+                    <div className="row" style={{gap:6}}>
+                      <button className="btn btn-secondary btn-sm" onClick={()=>handleMoveStrategy(idx,'up')}  disabled={idx===0}  title="Move up">↑</button>
+                      <button className="btn btn-secondary btn-sm" onClick={()=>handleMoveStrategy(idx,'down')} disabled={last} title="Move down">↓</button>
+                      <button className="btn btn-danger btn-sm"    onClick={()=>handleDeleteStrategy(s.id)}>Remove</button>
                     </div>
                   </div>
-                </>
+                  <div className="field">
+                    <label>Headline</label>
+                    <input value={e.headline||''} placeholder="e.g. Unlock equity through strategic improvement…"
+                      onChange={ev => setStratField(s.id,'headline',ev.target.value)} />
+                  </div>
+                  <div className="field">
+                    <label>Summary</label>
+                    <textarea value={e.summary||''} rows={3} style={{resize:"vertical"}}
+                      placeholder="Describe this strategic pathway in client-friendly language…"
+                      onChange={ev => setStratField(s.id,'summary',ev.target.value)} />
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px"}}>
+                    <div className="field">
+                      <label>Target Purchase Price</label>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                        <input type="number" min="0" value={e.target_purchase_price||''} placeholder="600000" style={{paddingLeft:22}}
+                          onChange={ev => setStratField(s.id,'target_purchase_price',ev.target.value)} />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label>Budget / Works</label>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                        <input type="number" min="0" value={e.budget_amount||''} placeholder="50000" style={{paddingLeft:22}}
+                          onChange={ev => setStratField(s.id,'budget_amount',ev.target.value)} />
+                      </div>
+                    </div>
+                    <div className="field">
+                      <label>Projected End Value</label>
+                      <div style={{position:"relative"}}>
+                        <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                        <input type="number" min="0" value={e.projected_end_value||''} placeholder="750000" style={{paddingLeft:22}}
+                          onChange={ev => setStratField(s.id,'projected_end_value',ev.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Supporting Notes <span style={{fontWeight:400,color:"#bbb"}}>(internal)</span></label>
+                    <textarea value={e.supporting_notes||''} rows={2} style={{resize:"vertical"}}
+                      placeholder="Research, comparables, caveats…"
+                      onChange={ev => setStratField(s.id,'supporting_notes',ev.target.value)} />
+                  </div>
+                  <div className="row" style={{justifyContent:"flex-end",alignItems:"center",gap:10}}>
+                    {msg==="saved" && <span style={{fontSize:12,color:"#2a5c3a"}}>✓ Saved</span>}
+                    {msg==="error" && <span style={{fontSize:12,color:"#8b2020"}}>Save failed</span>}
+                    <button className="btn btn-purple btn-sm" onClick={()=>saveStrategy(s)} disabled={stratSaving===s.id}>
+                      {stratSaving===s.id ? "Saving…" : "Save Strategy"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Add Strategy form */}
+            {addingStrat && (
+              <div className="strategy-card strategy-card-new">
+                <div className="pdr-section-label" style={{marginBottom:12}}>New Strategy</div>
+                <div className="field">
+                  <label>Strategy Type</label>
+                  <select value={newStrat.strategy_type} onChange={e=>setNewStrat(s=>({...s,strategy_type:e.target.value}))}
+                    style={{width:"100%",padding:"9px 12px",border:"1px solid var(--border-strong)",borderRadius:6,background:"var(--card)",color:"var(--text)",fontSize:14}}>
+                    {STRATEGY_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Headline</label>
+                  <input value={newStrat.headline} placeholder="e.g. Unlock equity through strategic improvement…"
+                    onChange={e=>setNewStrat(s=>({...s,headline:e.target.value}))} />
+                </div>
+                <div className="field">
+                  <label>Summary</label>
+                  <textarea value={newStrat.summary} rows={3} style={{resize:"vertical"}}
+                    placeholder="Describe this strategic pathway…"
+                    onChange={e=>setNewStrat(s=>({...s,summary:e.target.value}))} />
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0 16px"}}>
+                  <div className="field">
+                    <label>Target Purchase Price</label>
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                      <input type="number" min="0" value={newStrat.target_purchase_price} placeholder="600000" style={{paddingLeft:22}}
+                        onChange={e=>setNewStrat(s=>({...s,target_purchase_price:e.target.value}))} />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Budget / Works</label>
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                      <input type="number" min="0" value={newStrat.budget_amount} placeholder="50000" style={{paddingLeft:22}}
+                        onChange={e=>setNewStrat(s=>({...s,budget_amount:e.target.value}))} />
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Projected End Value</label>
+                    <div style={{position:"relative"}}>
+                      <span style={{position:"absolute",left:10,top:11,color:"#aaa",fontSize:13}}>$</span>
+                      <input type="number" min="0" value={newStrat.projected_end_value} placeholder="750000" style={{paddingLeft:22}}
+                        onChange={e=>setNewStrat(s=>({...s,projected_end_value:e.target.value}))} />
+                    </div>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Supporting Notes <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+                  <textarea value={newStrat.supporting_notes} rows={2} style={{resize:"vertical"}}
+                    placeholder="Research, comparables, caveats…"
+                    onChange={e=>setNewStrat(s=>({...s,supporting_notes:e.target.value}))} />
+                </div>
+                <div className="row" style={{justifyContent:"flex-end",gap:10}}>
+                  <button className="btn btn-secondary btn-sm" onClick={()=>{setAddingStrat(false);setNewStrat(BLANK_STRAT);}}>Cancel</button>
+                  <button className="btn btn-purple btn-sm" onClick={handleAddStrategy} disabled={addSaving}>
+                    {addSaving ? "Adding…" : "Add Strategy"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="divider" />
+              </>
             }
+
+            {/* Footer */}
+            <div className="row" style={{justifyContent:"space-between",gap:10}}>
+              <button className="btn btn-danger btn-sm" onClick={()=>{
+                if(window.confirm("Delete this PDR request? This cannot be undone.")) { onDelete(selected.id); setSelected(null); }
+              }}>Delete Request</button>
+              <button className="btn btn-secondary" onClick={()=>setSelected(null)}>Close</button>
+            </div>
           </div>
         </div>
       )}
