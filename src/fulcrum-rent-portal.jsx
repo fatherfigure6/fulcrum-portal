@@ -2596,10 +2596,10 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       if (!bodyContent.trim()) throw new Error('Could not render report HTML.');
 
       container = document.createElement('div');
-      // position:absolute instead of position:fixed — avoids html2canvas blank-capture bug.
-      // Explicit white background so html2canvas does not see a transparent layer.
-      // Do NOT use display:none or visibility:hidden — html2canvas fails on non-rendered elements.
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;background:#fff;';
+      // Must be on-screen at real coordinates — html2canvas clips elements at negative x/y.
+      // pointer-events:none prevents interaction during the brief generation period.
+      // Do NOT use display:none, visibility:hidden, opacity:0, or negative offsets.
+      container.style.cssText = 'position:fixed;left:0;top:0;width:1100px;background:#fff;pointer-events:none;';
       container.innerHTML = styleTag + bodyContent;
       document.body.appendChild(container);
 
