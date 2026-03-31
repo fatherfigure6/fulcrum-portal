@@ -6,7 +6,6 @@ import buildPdrReportData from './utils/buildPdrReportData';
 import PdrReportPreview   from './components/PdrReportPreview';
 import parseSalesCsv      from './utils/parseSalesCsv';
 import renderPdrReportHtml from './utils/renderPdrReportHtml';
-// html2pdf.js loaded dynamically inside handleGenerateReport only
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -2560,7 +2559,6 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     setReportGenerateError('');
     setReportHtmlUrl(''); setReportPdfUrl('');
 
-    let container = null;
     try {
       // 1. Build report data
       const report = buildPdrReportData({
@@ -2572,97 +2570,41 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       if (!report) throw new Error('Could not build report data.');
 
       // 2. Render HTML string — single source for both HTML file and PDF
-      // encodeURIComponent so spaces/commas in the filename are valid in fetch() calls
-      // made by html2canvas (useCORS). A 404 on an image with useCORS can blank the entire canvas.
       const logoUrl = window.location.origin + '/' + encodeURIComponent('No BG, Light Text.png');
       const htmlString = renderPdrReportHtml(report, { logoUrl });
       if (!htmlString || typeof htmlString !== 'string' || htmlString.trim().length < 100) {
         throw new Error('Could not render report HTML.');
       }
 
-      // 3. Generate PDF via dynamic import
-      let html2pdfLib;
-      try {
-        html2pdfLib = (await import('html2pdf.js')).default;
-      } catch {
-        throw new Error('PDF generation failed: library could not be loaded.');
-      }
-
-      // Load the full HTML document into a hidden iframe via srcdoc.
-      // This is the same rendering path as opening the blob URL in a browser tab,
-      // which is confirmed to render correctly. html2canvas then captures the
-      // iframe body from a fully-rendered document.
-      // Start off-screen — being attached and renderable matters.
-      // Do NOT use display:none or visibility:hidden.
-      container = document.createElement('iframe');
-      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;height:800px;border:none;pointer-events:none;background:#fff;';
-      document.body.appendChild(container);
-
-      // Wait for the iframe document to load
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => reject(new Error('PDF render timed out.')), 15000);
-        container.onload = () => { clearTimeout(timeout); resolve(); };
-        container.srcdoc = htmlString;
-      });
-
-      // Wait for paint cycles to complete after load
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-      // Guard: verify the iframe document is accessible and has real content
-      const iframeDoc = container.contentDocument;
-      const iframeBody = iframeDoc?.body;
-      if (!iframeBody || iframeBody.innerHTML.trim().length < 100) {
-        throw new Error('Could not render report HTML.');
-      }
-
-      // Expand iframe to full content height so html2canvas captures the whole page
-      const contentHeight = iframeBody.scrollHeight;
-      if (!contentHeight) throw new Error('Could not render report HTML.');
-      container.style.height = contentHeight + 'px';
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-      // Move iframe on-screen behind app UI before capture.
-      // Backgrounds and gradients may not paint for elements at large negative offsets.
-      // z-index:-1 keeps it behind the loading overlay — no visible flash to the user.
-      container.style.cssText = 'position:fixed;left:0;top:0;width:1100px;height:' + contentHeight + 'px;border:none;pointer-events:none;z-index:-1;background:#fff;';
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-      // Guard: verify document root is accessible before capture
-      if (!iframeDoc || !iframeDoc.documentElement) {
-        throw new Error('Could not render report HTML.');
-      }
-
-      let pdfBlob;
-      try {
-        pdfBlob = await html2pdfLib()
-          .set({
-            margin: 0,
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: {
-              scale: 2,
-              useCORS: true,
-              logging: false,
-              windowWidth: 1100,
-              scrollX: 0,
-              scrollY: 0,
-            },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          })
-          .from(iframeDoc.documentElement)
-          .outputPdf('blob');
-      } catch {
-        throw new Error('Could not generate PDF.');
-      }
-
-      if (!pdfBlob || !(pdfBlob instanceof Blob) || pdfBlob.size === 0) throw new Error('Could not generate PDF.');
-
-      // 4. Upload HTML
+      // 3. Upload HTML first — preserved even if PDF generation fails
       const htmlPath = `pdr/${selected.id}/report.html`;
       const htmlBlob = new Blob([htmlString], { type: 'text/html' });
       const { error: htmlUploadErr } = await supabase.storage
         .from('pdr-reports')
         .upload(htmlPath, htmlBlob, { upsert: true, contentType: 'text/html; charset=utf-8' });
       if (htmlUploadErr) throw new Error('HTML upload failed: ' + htmlUploadErr.message);
+
+      // 4. Generate PDF via server-side Playwright
+      const pdfResponse = await fetch('/api/render-pdr-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          html: htmlString,
+          requestId: selected.id,
+        }),
+      });
+
+      if (!pdfResponse.ok) {
+        let errMsg = 'PDF generation failed.';
+        try {
+          const errData = await pdfResponse.json();
+          if (errData.error) errMsg = errData.error;
+        } catch {}
+        throw new Error(errMsg);
+      }
+
+      const pdfBlob = await pdfResponse.blob();
+      if (!pdfBlob || pdfBlob.size === 0) throw new Error('Could not generate PDF.');
 
       // 5. Upload PDF — cleanup HTML on failure
       const pdfPath = `pdr/${selected.id}/report.pdf`;
@@ -2699,7 +2641,6 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     } catch (err) {
       setReportGenerateError(err.message || 'Report generation failed.');
     } finally {
-      if (container && container.parentNode) container.parentNode.removeChild(container);
       setReportGenerating(false);
     }
   };
