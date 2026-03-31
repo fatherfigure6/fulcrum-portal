@@ -2596,12 +2596,24 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       if (!bodyContent.trim()) throw new Error('Could not render report HTML.');
 
       container = document.createElement('div');
-      // Must be on-screen at real coordinates — html2canvas clips elements at negative x/y.
-      // pointer-events:none prevents interaction during the brief generation period.
-      // Do NOT use display:none, visibility:hidden, opacity:0, or negative offsets.
-      container.style.cssText = 'position:fixed;left:0;top:0;width:1100px;background:#fff;pointer-events:none;';
+      // Off-screen but renderable — position:absolute is the lower-risk positioning mode for this test pass.
+      // Do NOT use display:none, visibility:hidden, or opacity:0 — html2canvas skips non-rendered elements.
+      container.style.cssText = 'position:absolute;left:-9999px;top:0;width:1100px;background:#fff;pointer-events:none;';
       container.innerHTML = styleTag + bodyContent;
       document.body.appendChild(container);
+
+      // Wait for the browser to complete layout and paint before html2canvas captures the container.
+      // html2canvas can return a blank canvas if called before the element is painted.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+      // Sanity check: container must have measurable dimensions before capture.
+      // offsetWidth/offsetHeight give layout dimensions; getBoundingClientRect provides a second signal.
+      const containerW = container.offsetWidth;
+      const containerH = container.offsetHeight;
+      const containerRect = container.getBoundingClientRect();
+      if (!containerW || !containerH || !containerRect.width || !containerRect.height) {
+        throw new Error('Could not render report HTML.');
+      }
 
       let pdfBlob;
       try {
@@ -2609,7 +2621,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
           .set({
             margin: 0,
             image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: { scale: 2, useCORS: true, logging: false, scrollX: 0, scrollY: 0 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
           })
           .from(container)
