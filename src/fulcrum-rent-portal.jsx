@@ -5,6 +5,8 @@ import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Out
 import buildPdrReportData from './utils/buildPdrReportData';
 import PdrReportPreview   from './components/PdrReportPreview';
 import parseSalesCsv      from './utils/parseSalesCsv';
+import renderPdrReportHtml from './utils/renderPdrReportHtml';
+// html2pdf.js loaded dynamically inside handleGenerateReport only
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -2395,8 +2397,10 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         supporting_notes:  selected.supportingNotes  || '',
       });
       setFulMsg('');
+      setReportGenerating(false); setReportGenerateError('');
+      setReportHtmlUrl(''); setReportPdfUrl('');
     }
-  }, [selected?.id]);
+  }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveFulfilment = async () => {
     setFulSaving(true); setFulMsg('');
@@ -2499,6 +2503,149 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     setSalesWarnings(parsed.warnings);
     setSalesUploadStatus('done');
     onRefresh();
+  };
+
+  // ── Report generation state ───────────────────────────────────────────────
+  const [reportGenerating,    setReportGenerating]    = useState(false);
+  const [reportGenerateError, setReportGenerateError] = useState('');
+  const [reportHtmlUrl,       setReportHtmlUrl]       = useState('');
+  const [reportPdfUrl,        setReportPdfUrl]        = useState('');
+
+  // Reset report URLs when request changes; load signed URLs if paths already exist
+  useEffect(() => {
+    let cancelled = false;
+    setReportHtmlUrl(''); setReportPdfUrl('');
+    if (!selected?.id || (!selected.reportHtmlPath && !selected.reportPdfPath)) {
+      return () => { cancelled = true; };
+    }
+
+    (async () => {
+      try {
+        const [htmlResult, pdfResult] = await Promise.all([
+          selected.reportHtmlPath
+            ? supabase.storage.from('pdr-reports').createSignedUrl(selected.reportHtmlPath, 3600)
+            : Promise.resolve(null),
+          selected.reportPdfPath
+            ? supabase.storage.from('pdr-reports').createSignedUrl(selected.reportPdfPath, 3600)
+            : Promise.resolve(null),
+        ]);
+        if (cancelled) return;
+        if (htmlResult?.error || pdfResult?.error) {
+          setReportGenerateError('Report links could not be loaded.');
+          return;
+        }
+        if (htmlResult?.data?.signedUrl) setReportHtmlUrl(htmlResult.data.signedUrl);
+        if (pdfResult?.data?.signedUrl)  setReportPdfUrl(pdfResult.data.signedUrl);
+      } catch {
+        if (!cancelled) setReportGenerateError('Report links could not be loaded.');
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [selected?.id, selected?.reportHtmlPath, selected?.reportPdfPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGenerateReport = async () => {
+    if (reportGenerating) return;
+    if (!selected?.id) { setReportGenerateError('No request selected.'); return; }
+
+    setReportGenerating(true);
+    setReportGenerateError('');
+    setReportHtmlUrl(''); setReportPdfUrl('');
+
+    let container = null;
+    try {
+      // 1. Build report data
+      const report = buildPdrReportData({
+        ...selected,
+        heroStatement:    ful.hero_statement    || selected.heroStatement,
+        viabilitySummary: ful.viability_summary || selected.viabilitySummary,
+        supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
+      }, salesRows);
+      if (!report) throw new Error('Could not build report data.');
+
+      // 2. Render HTML string — single source for both HTML file and PDF
+      const logoUrl = window.location.origin + '/No BG, Light Text.png';
+      const htmlString = renderPdrReportHtml(report, { logoUrl });
+      if (!htmlString || typeof htmlString !== 'string' || htmlString.trim().length < 100) {
+        throw new Error('Could not render report HTML.');
+      }
+
+      // 3. Generate PDF via dynamic import
+      let html2pdfLib;
+      try {
+        html2pdfLib = (await import('html2pdf.js')).default;
+      } catch {
+        throw new Error('PDF generation failed: library could not be loaded.');
+      }
+
+      container = document.createElement('div');
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:1100px;visibility:hidden;';
+      container.innerHTML = htmlString;
+      document.body.appendChild(container);
+
+      let pdfBlob;
+      try {
+        pdfBlob = await html2pdfLib()
+          .set({
+            margin: 0,
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          })
+          .from(container)
+          .outputPdf('blob');
+      } catch {
+        throw new Error('Could not generate PDF.');
+      }
+
+      if (!pdfBlob || !(pdfBlob instanceof Blob)) throw new Error('Could not generate PDF.');
+
+      // 4. Upload HTML
+      const htmlPath = `pdr/${selected.id}/report.html`;
+      const htmlBlob = new Blob([htmlString], { type: 'text/html' });
+      const { error: htmlUploadErr } = await supabase.storage
+        .from('pdr-reports')
+        .upload(htmlPath, htmlBlob, { upsert: true, contentType: 'text/html' });
+      if (htmlUploadErr) throw new Error('HTML upload failed: ' + htmlUploadErr.message);
+
+      // 5. Upload PDF — cleanup HTML on failure
+      const pdfPath = `pdr/${selected.id}/report.pdf`;
+      const { error: pdfUploadErr } = await supabase.storage
+        .from('pdr-reports')
+        .upload(pdfPath, pdfBlob, { upsert: true, contentType: 'application/pdf' });
+      if (pdfUploadErr) {
+        try { await supabase.storage.from('pdr-reports').remove([htmlPath]); } catch { /* cleanup best-effort */ }
+        throw new Error('PDF upload failed: ' + pdfUploadErr.message);
+      }
+
+      // 6. Save paths to DB — cleanup both files on failure
+      const { error: dbErr } = await supabase.from('request_pdr_details')
+        .update({ report_html_path: htmlPath, report_pdf_path: pdfPath })
+        .eq('request_id', selected.id);
+      if (dbErr) {
+        try { await supabase.storage.from('pdr-reports').remove([htmlPath, pdfPath]); } catch { /* cleanup best-effort */ }
+        throw new Error('Report paths not saved: ' + dbErr.message);
+      }
+
+      // 7. Generate signed URLs — non-fatal
+      const [htmlSigned, pdfSigned] = await Promise.all([
+        supabase.storage.from('pdr-reports').createSignedUrl(htmlPath, 3600),
+        supabase.storage.from('pdr-reports').createSignedUrl(pdfPath, 3600),
+      ]);
+      if (htmlSigned.error || pdfSigned.error) {
+        setReportGenerateError('Report saved but access links could not be generated.');
+      } else {
+        if (htmlSigned.data?.signedUrl) setReportHtmlUrl(htmlSigned.data.signedUrl);
+        if (pdfSigned.data?.signedUrl)  setReportPdfUrl(pdfSigned.data.signedUrl);
+      }
+
+      onRefresh();
+    } catch (err) {
+      setReportGenerateError(err.message || 'Report generation failed.');
+    } finally {
+      if (container) { try { document.body.removeChild(container); } catch { /* already removed */ } }
+      setReportGenerating(false);
+    }
   };
 
   // ── Strategy state ────────────────────────────────────────────────────────
@@ -2919,7 +3066,54 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
               </div>
             )}
 
+            {/* ── Report Output ─────────────────────────────────────────── */}
             <div className="divider" />
+            <div className="pdr-section-label">Report Output</div>
+            <div style={{marginBottom:8}}>
+              <button
+                className="btn btn-purple"
+                onClick={handleGenerateReport}
+                disabled={reportGenerating}
+                style={{marginBottom:12}}
+              >
+                {reportGenerating
+                  ? 'Generating…'
+                  : (reportHtmlUrl || selected.reportHtmlPath)
+                    ? 'Regenerate Report'
+                    : 'Generate Report'}
+              </button>
+
+              {reportGenerating && (
+                <div style={{color:'#aaa', fontSize:13, marginBottom:8}}>Generating report…</div>
+              )}
+              {reportGenerateError && (
+                <div style={{color:'#f66', fontSize:13, marginBottom:8}}>{reportGenerateError}</div>
+              )}
+
+              {(reportHtmlUrl || reportPdfUrl) && (
+                <div style={{display:'flex', gap:12, flexWrap:'wrap', marginTop:4}}>
+                  {reportHtmlUrl && (
+                    <a href={reportHtmlUrl} target="_blank" rel="noreferrer"
+                      className="btn btn-secondary btn-sm">
+                      Open HTML Report
+                    </a>
+                  )}
+                  {reportPdfUrl && (
+                    <a href={reportPdfUrl} download={`pdr-${selected.id}.pdf`}
+                      className="btn btn-secondary btn-sm">
+                      Download PDF
+                    </a>
+                  )}
+                </div>
+              )}
+              {!reportHtmlUrl && !reportPdfUrl
+                && (selected.reportHtmlPath || selected.reportPdfPath)
+                && !reportGenerating
+                && !reportGenerateError && (
+                <div style={{color:'#aaa', fontSize:12}}>Previously generated — links loading…</div>
+              )}
+            </div>
+
               </>
             }
 
