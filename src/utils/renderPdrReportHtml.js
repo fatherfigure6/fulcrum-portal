@@ -40,28 +40,18 @@ const STRATEGY_LABELS = {
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  :root {
-    --primary: #2c3e50;
-    --primary-2: #22313f;
-    --text: #1f2933;
-    --muted: #6b7280;
-    --line: #d9e0e7;
-    --soft: #f4f6f8;
-    --white: #ffffff;
-  }
-
   body {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 15px;
     line-height: 1.45;
-    color: var(--text);
+    color: #1f2933;
     background: #f0f2f5;
   }
 
   .report {
     max-width: 1100px;
     margin: 0 auto;
-    background: var(--white);
+    background: #ffffff;
     border-radius: 28px;
     overflow: hidden;
     border: 1px solid #e5ebf0;
@@ -69,8 +59,8 @@ const CSS = `
 
   /* ── Hero ── */
   .hero {
-    background: linear-gradient(180deg, var(--primary) 0%, var(--primary-2) 100%);
-    color: var(--white);
+    background: linear-gradient(180deg, #2c3e50 0%, #22313f 100%);
+    color: #ffffff;
     padding: 40px 44px 48px;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -108,7 +98,7 @@ const CSS = `
     line-height: 0.98;
     letter-spacing: -0.04em;
     margin-bottom: 14px;
-    color: var(--white);
+    color: #ffffff;
   }
 
   .hero-sub {
@@ -135,14 +125,14 @@ const CSS = `
     letter-spacing: 0.14em;
     opacity: 0.7;
     margin-bottom: 6px;
-    color: var(--white);
+    color: #ffffff;
   }
 
   .meta-value {
     font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
-    color: var(--white);
+    color: #ffffff;
   }
 
   /* ── Sections ── */
@@ -152,12 +142,12 @@ const CSS = `
   }
 
   .section-soft {
-    background: var(--soft);
+    background: #f4f6f8;
   }
 
   .section-dark {
-    background: var(--primary);
-    color: var(--white);
+    background: #2c3e50;
+    color: #ffffff;
     border-top: 0;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -170,7 +160,7 @@ const CSS = `
     font-weight: 700;
     letter-spacing: 0.16em;
     text-transform: uppercase;
-    color: var(--primary);
+    color: #2c3e50;
   }
 
   .section-dark .eyebrow {
@@ -187,7 +177,7 @@ const CSS = `
   .intro {
     max-width: 760px;
     font-size: 16px;
-    color: var(--muted);
+    color: #6b7280;
   }
 
   .section-dark .intro,
@@ -205,8 +195,8 @@ const CSS = `
   }
 
   .card {
-    background: var(--white);
-    border: 1px solid var(--line);
+    background: #ffffff;
+    border: 1px solid #d9e0e7;
     border-radius: 24px;
     padding: 28px;
   }
@@ -215,18 +205,18 @@ const CSS = `
     font-size: 34px;
     line-height: 1.04;
     letter-spacing: -0.03em;
-    color: var(--primary);
+    color: #2c3e50;
     margin-bottom: 14px;
   }
 
   .card p {
-    color: var(--muted);
+    color: #6b7280;
     font-size: 16px;
   }
 
   .brief {
     background: #f8fafb;
-    border: 1px solid var(--line);
+    border: 1px solid #d9e0e7;
     border-radius: 24px;
     padding: 24px;
   }
@@ -243,7 +233,7 @@ const CSS = `
     font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: var(--muted);
+    color: #6b7280;
     margin-bottom: 6px;
     font-weight: 700;
   }
@@ -251,7 +241,7 @@ const CSS = `
   .brief-value {
     font-size: 17px;
     font-weight: 700;
-    color: var(--primary);
+    color: #2c3e50;
     letter-spacing: -0.02em;
   }
 
@@ -275,7 +265,7 @@ const CSS = `
     font-size: 26px;
     line-height: 1.05;
     letter-spacing: -0.03em;
-    color: var(--white);
+    color: #ffffff;
     margin-bottom: 12px;
   }
 
@@ -305,7 +295,7 @@ const CSS = `
     font-size: 34px;
     font-weight: 800;
     letter-spacing: -0.04em;
-    color: var(--white);
+    color: #ffffff;
     line-height: 1.02;
     margin-bottom: 8px;
   }
@@ -313,10 +303,10 @@ const CSS = `
   /* ── Sales table ── */
   .table-wrap {
     margin-top: 24px;
-    border: 1px solid var(--line);
+    border: 1px solid #d9e0e7;
     border-radius: 20px;
     overflow: hidden;
-    background: var(--white);
+    background: #ffffff;
   }
 
   .sales-table {
@@ -325,8 +315,8 @@ const CSS = `
   }
 
   .sales-table thead th {
-    background: var(--primary);
-    color: var(--white);
+    background: #2c3e50;
+    color: #ffffff;
     text-align: left;
     padding: 14px 18px;
     font-size: 12px;
@@ -342,7 +332,7 @@ const CSS = `
     padding: 14px 18px;
     border-top: 1px solid #edf1f4;
     font-size: 15px;
-    color: var(--text);
+    color: #1f2933;
     vertical-align: middle;
   }
 
@@ -358,7 +348,7 @@ const CSS = `
   /* ── Final statement ── */
   .final-box {
     background: #f8fafb;
-    border: 1px solid var(--line);
+    border: 1px solid #d9e0e7;
     border-radius: 24px;
     padding: 28px;
     margin-top: 14px;
@@ -368,18 +358,18 @@ const CSS = `
     font-size: 32px;
     line-height: 1.08;
     letter-spacing: -0.03em;
-    color: var(--primary);
+    color: #2c3e50;
     font-weight: 800;
   }
 
   .note {
     margin-top: 14px;
     font-size: 13px;
-    color: var(--muted);
+    color: #6b7280;
   }
 
   @media print {
-    body { margin: 0; background: var(--white); }
+    body { margin: 0; background: #ffffff; }
     .report { border-radius: 0; border: none; box-shadow: none; }
     .hero, .section-dark, .sales-table thead { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -496,10 +486,10 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         ${salesExamples.slice(0, 3).map(sale => `
           <div class="card" style="min-height:180px;display:flex;flex-direction:column;justify-content:space-between;">
             <div>
-              <p style="font-size:20px;font-weight:800;letter-spacing:-0.03em;color:var(--primary);margin-bottom:10px;">${v(sale.address)}</p>
-              <p style="color:var(--muted);font-size:14px;margin-bottom:16px;">${v(sale.meta)}</p>
+              <p style="font-size:20px;font-weight:800;letter-spacing:-0.03em;color:#2c3e50;margin-bottom:10px;">${v(sale.address)}</p>
+              <p style="color:#6b7280;font-size:14px;margin-bottom:16px;">${v(sale.meta)}</p>
             </div>
-            <p style="font-size:24px;font-weight:800;letter-spacing:-0.03em;color:var(--primary);">${v(sale.price)}</p>
+            <p style="font-size:24px;font-weight:800;letter-spacing:-0.03em;color:#2c3e50;">${v(sale.price)}</p>
           </div>`).join('')}
       </div>
     </section>` : '';
@@ -512,8 +502,8 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:24px;">
         ${pathways.slice(0, 3).map(pw => `
           <div class="card">
-            <h3 style="font-size:22px;letter-spacing:-0.03em;color:var(--primary);margin-bottom:12px;">${v(pw.title)}</h3>
-            <ul style="padding-left:18px;color:var(--muted);">
+            <h3 style="font-size:22px;letter-spacing:-0.03em;color:#2c3e50;margin-bottom:12px;">${v(pw.title)}</h3>
+            <ul style="padding-left:18px;color:#6b7280;">
               ${(pw.points || []).map(pt => `<li style="margin-bottom:8px;">${v(pt)}</li>`).join('')}
             </ul>
           </div>`).join('')}
