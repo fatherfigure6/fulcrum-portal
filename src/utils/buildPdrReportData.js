@@ -15,7 +15,7 @@ function fmtMoney(n) {
   }).format(num);
 }
 
-export default function buildPdrReportData(request) {
+export default function buildPdrReportData(request, salesRows = []) {
   // request.type is the alias set in normaliseRequest: type = row.request_type
   if (!request || request.type !== 'pdr') return null;
 
@@ -100,8 +100,9 @@ export default function buildPdrReportData(request) {
     pathwaysIntro: null,
     pathways:      [],   // { title, points[] }
 
-    // ── Underlying sales table (Phase 4 — CSV parsing) ────────────────────
-    salesRows: [],       // { address, salePrice, saleDate, bedrooms, bathrooms }
+    // ── Underlying sales table (populated from parseSalesCsv) ────────────
+    salesRows,
+    salesRowCount: salesRows.length,
     salesNote: null,
 
     // ── Final statement (Phase 4 — staff narrative input) ─────────────────

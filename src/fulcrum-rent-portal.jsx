@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Outlet } from "react-router-dom";
 import buildPdrReportData from './utils/buildPdrReportData';
 import PdrReportPreview   from './components/PdrReportPreview';
+import parseSalesCsv      from './utils/parseSalesCsv';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -2407,6 +2408,99 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     setFulSaving(false);
   };
 
+  // ── CSV / Market Evidence state ───────────────────────────────────────────
+  const [salesRows,         setSalesRows]         = useState([]);
+  const [salesRowCount,     setSalesRowCount]      = useState(0);
+  const [salesWarnings,     setSalesWarnings]      = useState([]);
+  const [salesUploadStatus, setSalesUploadStatus]  = useState('idle'); // 'idle'|'uploading'|'done'|'error'
+  const [salesUploadError,  setSalesUploadError]   = useState('');
+  const [salesLoading,      setSalesLoading]       = useState(false);
+
+  // Load stored CSV whenever selected request (or its stored path) changes
+  useEffect(() => {
+    let cancelled = false;
+    setSalesRows([]); setSalesRowCount(0); setSalesWarnings([]);
+    setSalesUploadStatus('idle'); setSalesUploadError('');
+    if (!selected?.salesCsvFilePath) return () => { cancelled = true; };
+    setSalesLoading(true);
+    supabase.storage.from('pdr-assets').download(selected.salesCsvFilePath)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          setSalesRows([]); setSalesRowCount(0); setSalesWarnings([]);
+          setSalesUploadError('Could not load stored CSV.');
+          setSalesLoading(false);
+          return;
+        }
+        return data.text().then(text => {
+          if (cancelled) return;
+          try {
+            const result = parseSalesCsv(text);
+            if (cancelled) return;
+            setSalesRows(result.rows);
+            setSalesRowCount(result.rowCount);
+            setSalesWarnings(result.warnings);
+            setSalesUploadStatus('done');
+          } catch (err) {
+            if (cancelled) return;
+            setSalesRows([]); setSalesRowCount(0); setSalesWarnings([]);
+            setSalesUploadError(err.message || 'CSV parse failed.');
+          }
+        });
+      })
+      .catch(err => {
+        if (cancelled) return;
+        setSalesRows([]); setSalesRowCount(0); setSalesWarnings([]);
+        setSalesUploadError(err.message || 'CSV load failed.');
+      })
+      .finally(() => { if (!cancelled) setSalesLoading(false); });
+    return () => { cancelled = true; };
+  }, [selected?.id, selected?.salesCsvFilePath]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleCsvUpload = async (file) => {
+    setSalesUploadError('');
+    if (!file) return;
+    if (file.size === 0) { setSalesUploadError('File is empty.'); return; }
+    if (file.size > 2 * 1024 * 1024) { setSalesUploadError('File exceeds 2 MB limit.'); return; }
+    const isLikelyCsv = file.type === 'text/csv' || file.type === '' || file.name?.toLowerCase().endsWith('.csv');
+    if (!isLikelyCsv) { setSalesUploadError('Please upload a CSV file.'); return; }
+
+    let parsed;
+    try {
+      const text = await file.text();
+      parsed = parseSalesCsv(text);
+    } catch (err) {
+      setSalesUploadError(err.message || 'CSV parse failed.');
+      return;
+    }
+
+    setSalesUploadStatus('uploading');
+    const path = `pdr/${selected.id}/sales.csv`;
+    const { error: uploadErr } = await supabase.storage
+      .from('pdr-assets')
+      .upload(path, file, { upsert: true, contentType: 'text/csv' });
+    if (uploadErr) {
+      setSalesUploadStatus('error');
+      setSalesUploadError(uploadErr.message);
+      return;
+    }
+
+    const { error: dbErr } = await supabase.from('request_pdr_details')
+      .update({ sales_csv_file_path: path })
+      .eq('request_id', selected.id);
+    if (dbErr) {
+      setSalesUploadStatus('error');
+      setSalesUploadError('Uploaded but failed to save path: ' + dbErr.message);
+      return;
+    }
+
+    setSalesRows(parsed.rows);
+    setSalesRowCount(parsed.rowCount);
+    setSalesWarnings(parsed.warnings);
+    setSalesUploadStatus('done');
+    onRefresh();
+  };
+
   // ── Strategy state ────────────────────────────────────────────────────────
   const [stratEdits,  setStratEdits]  = useState({});
   const [stratSaving, setStratSaving] = useState(null);
@@ -2488,7 +2582,11 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     setAddSaving(false);
   };
 
-  const openRequest = r => { setSelected(r); setAddingStrat(false); setNewStrat(BLANK_STRAT); setPreviewMode(false); };
+  const openRequest = r => {
+    setSelected(r); setAddingStrat(false); setNewStrat(BLANK_STRAT); setPreviewMode(false);
+    setSalesRows([]); setSalesRowCount(0); setSalesWarnings([]);
+    setSalesUploadStatus('idle'); setSalesUploadError('');
+  };
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -2582,7 +2680,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
                   heroStatement:    ful.hero_statement    || selected.heroStatement,
                   viabilitySummary: ful.viability_summary || selected.viabilitySummary,
                   supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
-                })} />
+                }, salesRows)} />
               : <>
 
             {/* ── Section 1: Submitted Brief ───────────────────────────── */}
@@ -2635,6 +2733,41 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
               <button className="btn btn-purple" onClick={saveFulfilment} disabled={fulSaving}>
                 {fulSaving ? "Saving…" : "Save Positioning"}
               </button>
+            </div>
+
+            <div className="divider" />
+
+            {/* ── Market Evidence ───────────────────────────────────────── */}
+            <div className="pdr-section-label">Market Evidence</div>
+            <div style={{marginBottom:12}}>
+              {selected.salesCsvFilePath && (
+                <div style={{fontSize:12, color:'#aaa', marginBottom:6}}>
+                  Attached: {selected.salesCsvFilePath.split('/').pop()}
+                </div>
+              )}
+              <label className="form-label">Upload Sales CSV</label>
+              <input type="file" accept=".csv,text/csv"
+                onChange={e => handleCsvUpload(e.target.files[0])}
+                style={{display:'block', marginBottom:8}} />
+              {salesLoading && (
+                <span style={{color:'#aaa', fontSize:13}}>Loading saved CSV…</span>
+              )}
+              {!salesLoading && salesUploadStatus === 'uploading' && (
+                <span style={{color:'#aaa', fontSize:13}}>Uploading…</span>
+              )}
+              {!salesLoading && salesUploadStatus === 'done' && (
+                <span style={{color:'#7cfc00', fontSize:13}}>
+                  ✓ {salesRowCount} row{salesRowCount !== 1 ? 's' : ''} parsed
+                </span>
+              )}
+              {salesUploadError && (
+                <span style={{color:'#f66', fontSize:13, display:'block'}}>{salesUploadError}</span>
+              )}
+              {salesWarnings.length > 0 && (
+                <ul style={{color:'#f0a500', fontSize:12, margin:'4px 0 0 16px', padding:0}}>
+                  {salesWarnings.map((w, i) => <li key={i}>{w}</li>)}
+                </ul>
+              )}
             </div>
 
             <div className="divider" />
