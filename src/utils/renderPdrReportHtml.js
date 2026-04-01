@@ -517,7 +517,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     <!-- Block 3: 2-column Submitted Brief + Position Summary -->
     <div class="brief-position-row" style="padding:28px 36px;display:flex;gap:24px;align-items:flex-start;">
       <div style="flex:0 0 340px;min-width:0;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;padding:20px 22px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">Submitted Brief</div>
+        <div style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">Submitted Brief</div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Location</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(locations)}</span></div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Property Type</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(propertyTypes)}</span></div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Bedrooms</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(bedrooms)}</span></div>
@@ -526,7 +526,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
       </div>
       <div style="flex:1;min-width:0;height:auto;overflow:visible;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
-        <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
+        <div style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
         <div style="font-size:14px;font-weight:700;color:#0b2545;line-height:1.6;margin-bottom:10px;">${v(heroStatement)}</div>
         <div style="font-size:14px;color:#6b7280;line-height:1.6;">${v(viabilitySummary)}</div>
       </div>
