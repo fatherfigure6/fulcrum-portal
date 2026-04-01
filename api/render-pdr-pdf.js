@@ -21,16 +21,39 @@ module.exports = async (req, res) => {
       headless: chromium.headless,
     });
 
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'load' });
-    // Force screen media — page.pdf() defaults to print media.
-    // The report is designed for screen rendering, so this is the safer first pass.
+    const page = await browser.newPage({
+      viewport: { width: 1100, height: 1600 },
+    });
+
+    // Let content and linked assets settle.
+    await page.setContent(html, { waitUntil: 'networkidle' });
+
+    // Force screen media — the report is designed for screen layout, not print layout.
     await page.emulateMedia({ media: 'screen' });
 
+    // Wait for fonts to fully load before capture.
+    await page.evaluate(async () => {
+      if (document.fonts?.ready) await document.fonts.ready;
+    });
+
+    // Allow one additional frame for layout to settle after font metrics apply.
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+
+    await page.waitForTimeout(300);
+
+    // DEBUG: uncomment to capture screenshot and return PNG instead of PDF
+    // const png = await page.screenshot({ fullPage: true });
+    // res.setHeader('Content-Type', 'image/png');
+    // return res.status(200).send(png);
+
+    // PDF page width matches viewport width exactly — no shrink-to-fit scaling.
+    // Height uses the A4 aspect ratio equivalent of 1100px width: 1100 * (297 / 210) ≈ 1557px.
     const pdf = await page.pdf({
-      format: 'A4',
+      width: '1100px',
+      height: '1557px',
       printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      preferCSSPageSize: false,
+      margin: { top: '0', right: '0', bottom: '0', left: '0' },
     });
 
     res.setHeader('Content-Type', 'application/pdf');

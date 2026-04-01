@@ -41,12 +41,28 @@ const STRATEGY_LABELS = {
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  html, body {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   body {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     font-size: 15px;
     line-height: 1.45;
     color: #1f2933;
     background: #ffffff;
+  }
+
+  /* Prevent Playwright from splitting major Page 1 blocks across PDF page boundaries.
+     Must be in screen-media CSS — PDF is generated with emulateMedia('screen'). */
+  .brief-position-row,
+  .kpi-row,
+  .snapshot-block,
+  .affordability-block,
+  .best-fit-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .report {
@@ -363,7 +379,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
       : `<div style="width:273px;height:182px;min-width:273px;background:#e5e7eb;display:flex;align-items:center;justify-content:center;border-radius:10px 0 0 10px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"><span style="font-size:12px;color:#9ca3af;">No image</span></div>`;
 
     bestFitHtml = `
-      <div style="padding:0 36px 28px;">
+      <div class="best-fit-block" style="padding:0 36px 28px;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:12px;">Best-Fit Affordable Example</div>
         <div style="display:flex;align-items:stretch;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
           ${propImageHtml}
@@ -482,7 +498,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     </div>
 
     <!-- Block 3: 2-column Submitted Brief + Position Summary -->
-    <div style="padding:28px 36px;display:flex;gap:24px;align-items:flex-start;">
+    <div class="brief-position-row" style="padding:28px 36px;display:flex;gap:24px;align-items:flex-start;">
       <div style="flex:0 0 340px;min-width:0;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;padding:20px 22px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
         <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">Submitted Brief</div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Location</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(locations)}</span></div>
@@ -500,7 +516,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     </div>
 
     <!-- Block 4: 3 KPI cards -->
-    <div style="padding:0 36px 24px;display:flex;gap:16px;">
+    <div class="kpi-row" style="padding:0 36px 24px;display:flex;gap:16px;">
       <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Median Sale Price</div>
         <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${medianPrice != null ? fmtMoney(medianPrice) : '—'}</div>
@@ -519,14 +535,14 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     </div>
 
     <!-- Block 5: Price Position Snapshot -->
-    <div style="padding:0 36px 28px;">
+    <div class="snapshot-block" style="padding:0 36px 28px;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:14px;">Price Position Snapshot</div>
       ${rangeBarHtml}
       ${sparkHtml}
     </div>
 
     <!-- Block 6: Affordability Snapshot -->
-    <div style="padding:0 36px 28px;">
+    <div class="affordability-block" style="padding:0 36px 28px;">
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordability Snapshot</div>
       ${affordBarHtml}
     </div>
