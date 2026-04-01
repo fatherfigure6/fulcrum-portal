@@ -336,6 +336,7 @@ export default function App() {
   const recovering     = useRef(false);
   const profileLoadRef = useRef({ userId: null, promise: null });
   const isInitialLoad  = useRef(true);
+  const wasLoggedIn    = useRef(false); // true once a session has been successfully established
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -386,11 +387,14 @@ export default function App() {
         setIsLoading(false);
         if (profile.mustChangePassword) {
           navigate("/change-password", { replace: true });
-        } else if (!isInitialLoad.current) {
+        } else if (!isInitialLoad.current && !wasLoggedIn.current) {
+          // Only navigate on a genuine fresh login (session was not previously active).
+          // Skips navigation on token refreshes and tab-switch reconnects.
           const intendedPath = location.state?.from?.pathname;
           const safe = intendedPath && !AUTH_ONLY_PATHS.includes(intendedPath) ? intendedPath : "/dashboard";
           navigate(safe, { replace: true });
         }
+        wasLoggedIn.current = true;
         if (profile.role === "staff") {
           loadUsers().catch(err => {
             console.error("[loadUsers] failed:", err);
