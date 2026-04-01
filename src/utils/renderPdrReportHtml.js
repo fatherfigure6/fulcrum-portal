@@ -248,10 +248,6 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
   const {
     clientName            = '',
-    suburbSummary         = '',
-    propertyTypeSummary   = '',
-    bedroomSummary        = '',
-    livingSummary         = '',
     budgetDisplay         = '',
     locations             = '',
     propertyTypes         = '',
@@ -287,14 +283,9 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
   // ── Logo ─────────────────────────────────────────────────────────────────
   const logoHtml = (logoUrl && logoUrl.trim())
-    ? `<img src="${esc(logoUrl)}" alt="Fulcrum Australia" style="height:32px;width:auto;display:block;object-fit:contain;flex-shrink:0;" />`
+    ? `<img src="${esc(logoUrl)}" alt="Fulcrum Australia" style="height:45px;width:auto;display:block;object-fit:contain;flex-shrink:0;" />`
     : '';
 
-  // ── Compact header sub-line ───────────────────────────────────────────────
-  const heroSubParts = [suburbSummary, propertyTypeSummary, bedroomSummary, livingSummary]
-    .filter(Boolean)
-    .map(esc)
-    .join(' · ');
 
   // ── Intro strip sentence ──────────────────────────────────────────────────
   const salesCount = salesRows.length;
@@ -506,14 +497,15 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:visible;border:1px solid #e5ebf0;">
 
     <!-- Block 1: Compact dark header -->
-    <div style="background:#0b2545;padding:18px 36px;display:flex;align-items:center;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-      <div style="display:flex;align-items:center;gap:14px;">
+    <div style="background:#0b2545;padding:22px 36px;display:flex;align-items:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+      <div style="flex:1;display:flex;align-items:center;">
         ${logoHtml}
+      </div>
+      <div style="flex:1;text-align:center;">
         <span style="font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.75);">Price Discovery Report</span>
       </div>
-      <div style="text-align:right;">
+      <div style="flex:1;text-align:right;">
         <div style="font-size:18px;font-weight:700;color:#ffffff;">${v(clientName)}</div>
-        ${heroSubParts ? `<div style="font-size:13px;color:rgba(255,255,255,0.72);margin-top:3px;">${heroSubParts}</div>` : ''}
       </div>
     </div>
 
