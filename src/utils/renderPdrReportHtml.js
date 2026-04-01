@@ -396,7 +396,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
     bestFitHtml = `
       <div class="best-fit-block" style="padding:0 36px 28px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:12px;">Best-Fit Affordable Example</div>
+        <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:12px;">Best-Fit Affordable Example</div>
         <div style="display:flex;align-items:stretch;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
           ${propImageHtml}
           <div style="flex:1;min-width:0;padding:20px 22px;">
@@ -553,7 +553,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
     <!-- Block 5: Price Position Snapshot -->
     <div class="snapshot-block" style="padding:0 36px 28px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:14px;">Price Position Snapshot</div>
+      <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:14px;">Price Position Snapshot</div>
       ${rangeBarHtml}
       ${sparkHtml}
     </div>
