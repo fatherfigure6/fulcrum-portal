@@ -399,10 +399,8 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     const label = esc(STRATEGY_LABELS[s.strategyType] || s.strategyType || 'Strategic Pathway');
     return `
     <section class="section section-dark" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-      <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
-      <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#ffffff;font-weight:700;">${v(s.headline)}</h2>
-      <p class="intro" style="max-width:760px;font-size:16px;color:rgba(255,255,255,0.86);margin:0;">${v(s.summary)}</p>
-      <div style="display:flex;gap:24px;margin-top:28px;align-items:flex-start;">
+      <span class="eyebrow" style="display:inline-block;margin-bottom:16px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
+      <div style="display:flex;gap:24px;margin-top:0;align-items:flex-start;">
         <div class="strategy-callout" style="flex:1.1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
           <h3 style="font-size:26px;line-height:1.05;letter-spacing:-0.03em;color:#ffffff;margin-bottom:12px;margin-top:0;font-weight:700;">${v(s.headline)}</h3>
           <p style="color:rgba(255,255,255,0.86);font-size:15px;margin:0;">${v(s.summary)}</p>
