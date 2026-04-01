@@ -321,10 +321,9 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
       return Math.min(100, Math.max(0, ((val - priceMin) / span) * 100));
     }
     const markerDefs = [
-      { pct: 0,                       label: fmtMoney(priceMin),   color: '#9ca3af', title: 'Min'    },
-      ...(budgetMax   != null ? [{ pct: markerPct(budgetMax),   label: fmtMoney(budgetMax),   color: '#2563eb', title: 'Budget' }] : []),
+      { pct: 0,   label: fmtMoney(priceMin),   color: '#9ca3af', title: 'Min'    },
       ...(medianPrice != null ? [{ pct: markerPct(medianPrice), label: fmtMoney(medianPrice), color: '#f59e0b', title: 'Median' }] : []),
-      { pct: 100,                      label: fmtMoney(priceMax),   color: '#9ca3af', title: 'Max'    },
+      { pct: 100, label: fmtMoney(priceMax),   color: '#9ca3af', title: 'Max'    },
     ];
 
     const markersHtml = markerDefs.map(m => `
