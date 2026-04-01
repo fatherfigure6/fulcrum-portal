@@ -54,9 +54,9 @@ const CSS = `
     background: #ffffff;
   }
 
-  /* Prevent Playwright from splitting major Page 1 blocks across PDF page boundaries.
-     Must be in screen-media CSS — PDF is generated with emulateMedia('screen'). */
-  .brief-position-row,
+  /* Prevent Playwright from splitting small data blocks across PDF page boundaries.
+     Must be in screen-media CSS — PDF is generated with emulateMedia('screen').
+     brief-position-row is excluded: it contains long narrative text and must break freely. */
   .kpi-row,
   .snapshot-block,
   .affordability-block,
@@ -70,7 +70,7 @@ const CSS = `
     margin: 0 auto;
     background: #ffffff;
     border-radius: 16px;
-    overflow: hidden;
+    overflow: visible; /* was: hidden — overflow:hidden clips content at PDF page boundaries */
     border: 1px solid #e5ebf0;
   }
 
@@ -401,9 +401,9 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     <section class="section section-dark" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <span class="eyebrow" style="display:inline-block;margin-bottom:16px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
       <div style="display:flex;gap:24px;margin-top:0;align-items:flex-start;">
-        <div class="strategy-callout" style="flex:1.1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
+        <div class="strategy-callout" style="flex:1.1;min-width:0;align-self:flex-start;height:auto;overflow:visible;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
           <h3 style="font-size:26px;line-height:1.05;letter-spacing:-0.03em;color:#ffffff;margin-bottom:12px;margin-top:0;font-weight:700;">${v(s.headline)}</h3>
-          <p style="color:rgba(255,255,255,0.86);font-size:15px;margin:0;">${v(s.summary)}</p>
+          <p style="color:rgba(255,255,255,0.86);font-size:15px;line-height:1.55;margin:0;">${v(s.summary)}</p>
         </div>
         <div style="flex:0.9;min-width:0;display:flex;flex-direction:column;gap:12px;">
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
@@ -476,7 +476,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   <style>${CSS}</style>
 </head>
 <body style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#1f2933;background:#ffffff;margin:0;padding:0;">
-  <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5ebf0;">
+  <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:visible;border:1px solid #e5ebf0;">
 
     <!-- Block 1: Compact dark header -->
     <div style="background:#0b2545;padding:18px 36px;display:flex;align-items:center;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
@@ -506,7 +506,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Purpose</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(purpose)}</span></div>
         <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
       </div>
-      <div style="flex:1;min-width:0;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
+      <div style="flex:1;min-width:0;height:auto;overflow:visible;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
         <div style="font-size:14px;font-weight:700;color:#0b2545;line-height:1.6;margin-bottom:10px;">${v(heroStatement)}</div>
         <div style="font-size:14px;color:#6b7280;line-height:1.6;">${v(viabilitySummary)}</div>
