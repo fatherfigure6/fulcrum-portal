@@ -425,15 +425,15 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         </div>
         <div style="flex:0.9;min-width:0;display:flex;flex-direction:column;gap:12px;">
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Target Purchase</div>
+            <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Target Purchase</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.targetPurchasePrice)}</div>
           </div>
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Capital / Works</div>
+            <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Capital / Works</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.budgetAmount)}</div>
           </div>
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Projected End Value</div>
+            <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Projected End Value</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.projectedEndValue)}</div>
           </div>
         </div>
@@ -535,17 +535,17 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     <!-- Block 4: 3 KPI cards -->
     <div class="kpi-row" style="padding:0 36px 24px;display:flex;gap:16px;">
       <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Median Sale Price</div>
+        <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Median Sale Price</div>
         <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${medianPrice != null ? fmtMoney(medianPrice) : '—'}</div>
         <div style="font-size:12px;color:#9ca3af;">${esc(medianAlignmentLabel || 'Market midpoint')}</div>
       </div>
       <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Budget vs Median</div>
+        <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Budget vs Median</div>
         <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${budgetVsMedian != null ? fmtMoney(Math.abs(budgetVsMedian)) : '—'}</div>
         <div style="font-size:12px;color:#9ca3af;">${budgetVsMedianPct != null ? Math.abs(budgetVsMedianPct) + '% ' + budgetVsDirection + ' median' : '—'}</div>
       </div>
       <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordable Sales</div>
+        <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordable Sales</div>
         <div style="font-size:28px;font-weight:800;color:#0b2545;line-height:1.1;margin-bottom:6px;">${affordableCount}</div>
         <div style="font-size:12px;color:#9ca3af;">${affordablePct != null ? affordablePct + '% of comparable sales' : 'within budget'}</div>
       </div>
@@ -560,7 +560,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
     <!-- Block 6: Affordability Snapshot -->
     <div class="affordability-block" style="padding:0 36px 28px;">
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordability Snapshot</div>
+      <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordability Snapshot</div>
       ${affordBarHtml}
     </div>
 
