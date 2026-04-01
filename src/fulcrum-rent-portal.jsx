@@ -5,6 +5,7 @@ import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Out
 import buildPdrReportData from './utils/buildPdrReportData';
 import PdrReportPreview   from './components/PdrReportPreview';
 import parseSalesCsv      from './utils/parseSalesCsv';
+import * as XLSX           from 'xlsx';
 import renderPdrReportHtml from './utils/renderPdrReportHtml';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
@@ -2465,15 +2466,24 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     if (!file) return;
     if (file.size === 0) { setSalesUploadError('File is empty.'); return; }
     if (file.size > 2 * 1024 * 1024) { setSalesUploadError('File exceeds 2 MB limit.'); return; }
-    const isLikelyCsv = file.type === 'text/csv' || file.type === '' || file.name?.toLowerCase().endsWith('.csv');
-    if (!isLikelyCsv) { setSalesUploadError('Please upload a CSV file.'); return; }
+    const name = file.name?.toLowerCase() ?? '';
+    const isXlsx = name.endsWith('.xlsx') || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const isCsv  = file.type === 'text/csv' || file.type === '' || name.endsWith('.csv');
+    if (!isXlsx && !isCsv) { setSalesUploadError('Please upload a CSV or XLSX file.'); return; }
 
     let parsed;
     try {
-      const text = await file.text();
+      let text;
+      if (isXlsx) {
+        const buf = await file.arrayBuffer();
+        const wb  = XLSX.read(buf, { type: 'array' });
+        text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+      } else {
+        text = await file.text();
+      }
       parsed = parseSalesCsv(text);
     } catch (err) {
-      setSalesUploadError(err.message || 'CSV parse failed.');
+      setSalesUploadError(err.message || 'File parse failed.');
       return;
     }
 
@@ -2890,7 +2900,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
                 </div>
               )}
               <label className="form-label">Upload Sales CSV</label>
-              <input type="file" accept=".csv,text/csv"
+              <input type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={e => handleCsvUpload(e.target.files[0])}
                 style={{display:'block', marginBottom:8}} />
               {salesLoading && (
