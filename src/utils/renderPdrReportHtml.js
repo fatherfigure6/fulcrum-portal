@@ -36,6 +36,7 @@ const STRATEGY_LABELS = {
 
 // ---------------------------------------------------------------------------
 // CSS — export-safe, print-oriented, no app shell dependencies
+// Legacy hero/cover rules removed. box-shadow suppressed for PDF output.
 // ---------------------------------------------------------------------------
 const CSS = `
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -45,97 +46,19 @@ const CSS = `
     font-size: 15px;
     line-height: 1.45;
     color: #1f2933;
-    background: #f0f2f5;
+    background: #ffffff;
   }
 
   .report {
     max-width: 1100px;
     margin: 0 auto;
     background: #ffffff;
-    border-radius: 28px;
+    border-radius: 16px;
     overflow: hidden;
     border: 1px solid #e5ebf0;
   }
 
-  /* ── Hero ── */
-  .hero {
-    background: linear-gradient(180deg, #2c3e50 0%, #22313f 100%);
-    color: #ffffff;
-    padding: 40px 44px 48px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  .hero-top {
-    margin-bottom: 36px;
-  }
-
-  .logo {
-    height: 40px;
-    width: auto;
-    display: block;
-    object-fit: contain;
-  }
-
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1.4fr 0.8fr;
-    gap: 32px;
-    align-items: end;
-  }
-
-  .kicker {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    opacity: 0.78;
-    margin-bottom: 18px;
-  }
-
-  .hero h1 {
-    font-size: 48px;
-    line-height: 0.98;
-    letter-spacing: -0.04em;
-    margin-bottom: 14px;
-    color: #ffffff;
-  }
-
-  .hero-sub {
-    font-size: 15px;
-    color: rgba(255,255,255,0.82);
-    max-width: 680px;
-  }
-
-  .hero-meta {
-    display: grid;
-    gap: 12px;
-  }
-
-  .meta-card {
-    border: 1px solid rgba(255,255,255,0.16);
-    border-radius: 18px;
-    padding: 16px 18px;
-    background: rgba(255,255,255,0.05);
-  }
-
-  .meta-label {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    opacity: 0.7;
-    margin-bottom: 6px;
-    color: #ffffff;
-  }
-
-  .meta-value {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    color: #ffffff;
-  }
-
-  /* ── Sections ── */
+  /* ── Shared section styles (used by downstream strategy/table sections) ── */
   .section {
     padding: 34px 44px;
     border-top: 1px solid #edf1f4;
@@ -163,9 +86,7 @@ const CSS = `
     color: #2c3e50;
   }
 
-  .section-dark .eyebrow {
-    color: rgba(255,255,255,0.72);
-  }
+  .section-dark .eyebrow { color: rgba(255,255,255,0.72); }
 
   .section-title {
     font-size: 30px;
@@ -182,18 +103,9 @@ const CSS = `
 
   .section-dark .intro,
   .section-dark p,
-  .section-dark li {
-    color: rgba(255,255,255,0.86);
-  }
+  .section-dark li { color: rgba(255,255,255,0.86); }
 
-  /* ── Position summary + brief ── */
-  .statement-grid {
-    display: grid;
-    grid-template-columns: 1.15fr 0.85fr;
-    gap: 30px;
-    align-items: stretch;
-  }
-
+  /* ── Card (used by pathways) ── */
   .card {
     background: #ffffff;
     border: 1px solid #d9e0e7;
@@ -201,59 +113,7 @@ const CSS = `
     padding: 28px;
   }
 
-  .card h2 {
-    font-size: 34px;
-    line-height: 1.04;
-    letter-spacing: -0.03em;
-    color: #2c3e50;
-    margin-bottom: 14px;
-  }
-
-  .card p {
-    color: #6b7280;
-    font-size: 16px;
-  }
-
-  .brief {
-    background: #f8fafb;
-    border: 1px solid #d9e0e7;
-    border-radius: 24px;
-    padding: 24px;
-  }
-
-  .brief-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px 22px;
-    margin-top: 12px;
-  }
-
-  .brief-label {
-    display: block;
-    font-size: 11px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #6b7280;
-    margin-bottom: 6px;
-    font-weight: 700;
-  }
-
-  .brief-value {
-    font-size: 17px;
-    font-weight: 700;
-    color: #2c3e50;
-    letter-spacing: -0.02em;
-  }
-
-  /* ── Strategy ── */
-  .strategy-grid {
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 24px;
-    margin-top: 28px;
-    align-items: start;
-  }
-
+  /* ── Strategy sections ── */
   .strategy-callout {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.14);
@@ -261,43 +121,11 @@ const CSS = `
     padding: 24px;
   }
 
-  .strategy-callout h3 {
-    font-size: 26px;
-    line-height: 1.05;
-    letter-spacing: -0.03em;
-    color: #ffffff;
-    margin-bottom: 12px;
-  }
-
-  .strategy-metrics {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-
   .metric {
     background: rgba(255,255,255,0.08);
     border: 1px solid rgba(255,255,255,0.14);
     border-radius: 22px;
     padding: 20px;
-  }
-
-  .metric-label {
-    font-size: 11px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.7);
-    font-weight: 700;
-    margin-bottom: 10px;
-  }
-
-  .metric-value {
-    font-size: 34px;
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    color: #ffffff;
-    line-height: 1.02;
-    margin-bottom: 8px;
   }
 
   /* ── Sales table ── */
@@ -336,14 +164,9 @@ const CSS = `
     vertical-align: middle;
   }
 
-  .sales-table tbody tr:nth-child(even) {
-    background: #fafcfd;
-  }
+  .sales-table tbody tr:nth-child(even) { background: #fafcfd; }
 
-  .empty-cell {
-    color: #aaa;
-    font-style: italic;
-  }
+  .empty-cell { color: #aaa; font-style: italic; }
 
   /* ── Final statement ── */
   .final-box {
@@ -362,16 +185,16 @@ const CSS = `
     font-weight: 800;
   }
 
-  .note {
-    margin-top: 14px;
-    font-size: 13px;
-    color: #6b7280;
-  }
+  .note { margin-top: 14px; font-size: 13px; color: #6b7280; }
 
   @media print {
-    body { margin: 0; background: #ffffff; }
-    .report { border-radius: 0; border: none; box-shadow: none; }
-    .hero, .section-dark, .sales-table thead { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    * { box-shadow: none !important; }
+    body { margin: 0; padding: 0; background: #ffffff; }
+    .report { border-radius: 0; border: none; max-width: 100%; }
+    .section-dark, .sales-table thead {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 `;
 
@@ -382,76 +205,204 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   if (!report) return '';
 
   const {
-    clientName       = '',
-    suburbSummary    = '',
-    propertyTypeSummary = '',
-    bedroomSummary   = '',
-    livingSummary    = '',
-    budgetDisplay    = '',
-    outcomeSummary   = '',
+    clientName            = '',
+    suburbSummary         = '',
+    propertyTypeSummary   = '',
+    bedroomSummary        = '',
+    livingSummary         = '',
+    budgetDisplay         = '',
+    locations             = '',
+    propertyTypes         = '',
+    bedrooms              = '',
+    bathrooms             = '',
+    purpose               = '',
+    rentalYield           = '',
+    heroStatement         = '',
+    viabilitySummary      = '',
+    salesRows             = [],
+    salesNote             = '',
+    finalStatement        = '',
+    strategies            = [],
+    pathways              = [],
 
-    locations        = '',
-    propertyTypes    = '',
-    bedrooms         = '',
-    bathrooms        = '',
-    purpose          = '',
-    rentalYield      = '',
-
-    heroStatement    = '',
-    viabilitySummary = '',
-
-    entryPoint       = '',
-    premiumPoint     = '',
-
-    salesExamples    = [],
-    strategies       = [],
-    pathways         = [],
-    salesRows        = [],
-    salesNote        = '',
-    finalStatement   = '',
+    // Computed market stats
+    budgetMax             = null,
+    medianPrice           = null,
+    budgetVsMedian        = null,
+    budgetVsMedianPct     = null,
+    medianAlignmentStatus = null,
+    medianAlignmentLabel  = null,
+    affordableCount       = 0,
+    affordablePct         = null,
+    priceMin              = null,
+    priceMax              = null,
+    allSalePrices         = [],
+    bestFitProperty       = null,
   } = report;
 
-  const hasPositioning   = entryPoint || premiumPoint;
-  const hasSalesExamples = salesExamples.length > 0;
-  const hasPathways      = pathways.length > 0;
+  const hasPathways       = pathways.length > 0;
   const hasFinalStatement = !!finalStatement;
 
   // ── Logo ─────────────────────────────────────────────────────────────────
   const logoHtml = (logoUrl && logoUrl.trim())
-    ? `<img class="logo" src="${esc(logoUrl)}" alt="Fulcrum Australia" style="height:40px;width:auto;display:block;object-fit:contain;" />`
+    ? `<img src="${esc(logoUrl)}" alt="Fulcrum Australia" style="height:32px;width:auto;display:block;object-fit:contain;flex-shrink:0;" />`
     : '';
 
-  // ── Hero sub-line ─────────────────────────────────────────────────────────
+  // ── Compact header sub-line ───────────────────────────────────────────────
   const heroSubParts = [suburbSummary, propertyTypeSummary, bedroomSummary, livingSummary]
     .filter(Boolean)
     .map(esc)
     .join(' · ');
 
-  // ── Strategies ───────────────────────────────────────────────────────────
+  // ── Intro strip sentence ──────────────────────────────────────────────────
+  const salesCount = salesRows.length;
+  const introSentence = (salesCount > 0 && locations)
+    ? `Based on ${salesCount} comparable sale${salesCount !== 1 ? 's' : ''} across ${esc(locations)}, here is where your budget of ${esc(budgetDisplay || '—')} sits in the current market.`
+    : `This report presents current market evidence to help position your property search in context of recent comparable sales.`;
+
+  // ── KPI colour: three-state green / amber / red ───────────────────────────
+  const medianColour = medianAlignmentStatus === 'above' ? '#16a34a'
+    : medianAlignmentStatus === 'near'  ? '#d97706'
+    : medianAlignmentStatus === 'below' ? '#dc2626'
+    : '#0b2545';
+
+  // "above" and "near" both display as "above"; "below" as "below"
+  const budgetVsDirection = medianAlignmentStatus === 'below' ? 'below' : 'above';
+
+  // ── Range bar ─────────────────────────────────────────────────────────────
+  const hasRangeBar = priceMin != null && priceMax != null && priceMin !== priceMax;
+  let rangeBarHtml;
+
+  if (hasRangeBar) {
+    const span = priceMax - priceMin;
+    function markerPct(val) {
+      return Math.min(100, Math.max(0, ((val - priceMin) / span) * 100));
+    }
+    const markerDefs = [
+      { pct: 0,                       label: fmtMoney(priceMin),   color: '#9ca3af', title: 'Min'    },
+      ...(budgetMax   != null ? [{ pct: markerPct(budgetMax),   label: fmtMoney(budgetMax),   color: '#2563eb', title: 'Budget' }] : []),
+      ...(medianPrice != null ? [{ pct: markerPct(medianPrice), label: fmtMoney(medianPrice), color: '#f59e0b', title: 'Median' }] : []),
+      { pct: 100,                      label: fmtMoney(priceMax),   color: '#9ca3af', title: 'Max'    },
+    ];
+
+    const markersHtml = markerDefs.map(m => `
+      <div style="position:absolute;left:${m.pct.toFixed(1)}%;top:0;transform:translateX(-50%);">
+        <div style="width:16px;height:16px;border-radius:50%;background:${m.color};margin:0 auto;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+        <div style="font-size:9px;font-weight:600;color:${m.color};text-align:center;white-space:nowrap;margin-top:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${m.label}</div>
+        <div style="font-size:9px;color:#9ca3af;text-align:center;white-space:nowrap;">${m.title}</div>
+      </div>`).join('');
+
+    rangeBarHtml = `
+      <div style="position:relative;height:72px;margin-bottom:4px;">
+        <div style="position:absolute;left:0;right:0;top:4px;height:8px;background:#e5e7eb;border-radius:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+        ${markersHtml}
+      </div>`;
+  } else {
+    rangeBarHtml = `<p style="font-size:13px;color:#9ca3af;margin:0;">—</p>`;
+  }
+
+  // ── Spark chart (sorted bars, green ≤ budget / red > budget) ─────────────
+  let sparkHtml = '';
+  if (allSalePrices.length > 0 && priceMax != null && priceMax > 0) {
+    const bars = allSalePrices.map(p => {
+      const h   = Math.max(4, Math.round((p / priceMax) * 100));
+      const col = (budgetMax != null && p <= budgetMax) ? '#16a34a' : '#dc2626';
+      return `<div style="flex:1;min-width:4px;border-radius:2px 2px 0 0;height:${h}%;background:${col};-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>`;
+    }).join('');
+    sparkHtml = `<div style="display:flex;align-items:flex-end;gap:3px;height:60px;margin-top:20px;">${bars}</div>`;
+  }
+
+  // ── Affordability stacked bar ─────────────────────────────────────────────
+  const nonAffordableCount = allSalePrices.length - affordableCount;
+  const afPct    = affordablePct != null ? affordablePct : 0;
+  const nonAfPct = 100 - afPct;
+
+  let affordBarHtml;
+  if (affordablePct != null) {
+    affordBarHtml = `
+      <div style="height:24px;border-radius:6px;overflow:hidden;display:flex;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        ${afPct > 0    ? `<div style="width:${afPct}%;background:#16a34a;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>` : ''}
+        ${nonAfPct > 0 ? `<div style="width:${nonAfPct}%;background:#dc2626;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>` : ''}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;">
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#16a34a;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>
+          ${affordableCount} sale${affordableCount !== 1 ? 's' : ''} within budget (${afPct}%)
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:#374151;">
+          <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#dc2626;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></span>
+          ${nonAffordableCount} sale${nonAffordableCount !== 1 ? 's' : ''} above budget
+        </div>
+      </div>`;
+  } else {
+    affordBarHtml = `
+      <div style="height:24px;border-radius:6px;background:#e5e7eb;-webkit-print-color-adjust:exact;print-color-adjust:exact;"></div>
+      <p style="font-size:13px;color:#9ca3af;margin-top:8px;">No comparable sales data available.</p>`;
+  }
+
+  // ── Best-fit affordable property ──────────────────────────────────────────
+  let bestFitHtml;
+  if (bestFitProperty != null) {
+    const addrParts  = [bestFitProperty.address, bestFitProperty.suburb, bestFitProperty.state, bestFitProperty.postcode].filter(Boolean);
+    const addressLine = addrParts.map(p => esc(String(p))).join(', ');
+
+    const pills = [];
+    if (bestFitProperty.beds      != null) pills.push(`${esc(String(bestFitProperty.beds))} bed`);
+    if (bestFitProperty.baths     != null) pills.push(`${esc(String(bestFitProperty.baths))} bath`);
+    if (bestFitProperty.cars      != null) pills.push(`${esc(String(bestFitProperty.cars))} car`);
+    if (bestFitProperty.landSize)          pills.push(esc(String(bestFitProperty.landSize)));
+    if (bestFitProperty.floorSize)         pills.push(esc(String(bestFitProperty.floorSize)));
+    if (bestFitProperty.yearBuilt)         pills.push(`Built ${esc(String(bestFitProperty.yearBuilt))}`);
+
+    const pillsHtml = pills.map(p =>
+      `<span style="background:#e0f2fe;color:#0369a1;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${p}</span>`
+    ).join('');
+
+    const propImageHtml = bestFitProperty.imageUrl
+      ? `<img src="${esc(bestFitProperty.imageUrl)}" alt="" style="width:273px;height:182px;object-fit:cover;object-position:center;display:block;border-radius:10px 0 0 10px;flex-shrink:0;" />`
+      : `<div style="width:273px;height:182px;min-width:273px;background:#e5e7eb;display:flex;align-items:center;justify-content:center;border-radius:10px 0 0 10px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"><span style="font-size:12px;color:#9ca3af;">No image</span></div>`;
+
+    bestFitHtml = `
+      <div style="padding:0 36px 28px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:12px;">Best-Fit Affordable Example</div>
+        <div style="display:flex;align-items:stretch;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+          ${propImageHtml}
+          <div style="flex:1;min-width:0;padding:20px 22px;">
+            <div style="font-size:17px;font-weight:700;color:#0b2545;margin-bottom:6px;">${addressLine || v(bestFitProperty.address)}</div>
+            <div style="font-size:24px;font-weight:800;color:#16a34a;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${fmtMoney(bestFitProperty.salePrice)}</div>
+            ${pillsHtml ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${pillsHtml}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+  } else {
+    bestFitHtml = `<p style="font-size:13px;color:#9ca3af;font-style:italic;padding:0 36px 20px;margin:0;">No sales within budget were identified in the uploaded data.</p>`;
+  }
+
+  // ── Strategies ────────────────────────────────────────────────────────────
   const strategiesHtml = strategies.map(s => {
     const label = esc(STRATEGY_LABELS[s.strategyType] || s.strategyType || 'Strategic Pathway');
     return `
-    <section class="section section-dark" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;">
+    <section class="section section-dark" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
       <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#ffffff;font-weight:700;">${v(s.headline)}</h2>
       <p class="intro" style="max-width:760px;font-size:16px;color:rgba(255,255,255,0.86);margin:0;">${v(s.summary)}</p>
-      <div class="strategy-grid" style="display:flex;gap:24px;margin-top:28px;align-items:flex-start;">
+      <div style="display:flex;gap:24px;margin-top:28px;align-items:flex-start;">
         <div class="strategy-callout" style="flex:1.1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
           <h3 style="font-size:26px;line-height:1.05;letter-spacing:-0.03em;color:#ffffff;margin-bottom:12px;margin-top:0;font-weight:700;">${v(s.headline)}</h3>
           <p style="color:rgba(255,255,255,0.86);font-size:15px;margin:0;">${v(s.summary)}</p>
         </div>
-        <div class="strategy-metrics" style="flex:0.9;min-width:0;display:flex;flex-direction:column;gap:12px;">
+        <div style="flex:0.9;min-width:0;display:flex;flex-direction:column;gap:12px;">
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div class="metric-label" style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Target Purchase</div>
-            <div class="metric-value" style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.targetPurchasePrice)}</div>
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Target Purchase</div>
+            <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.targetPurchasePrice)}</div>
           </div>
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div class="metric-label" style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Capital / Works</div>
-            <div class="metric-value" style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.budgetAmount)}</div>
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Capital / Works</div>
+            <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.budgetAmount)}</div>
           </div>
           <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
-            <div class="metric-label" style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Projected End Value</div>
-            <div class="metric-value" style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.projectedEndValue)}</div>
+            <div style="font-size:11px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Projected End Value</div>
+            <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.projectedEndValue)}</div>
           </div>
         </div>
       </div>
@@ -459,7 +410,9 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   }).join('');
 
   // ── Sales table rows ──────────────────────────────────────────────────────
-  const TD = 'padding:14px 18px;border-top:1px solid #edf1f4;font-size:15px;color:#1f2933;vertical-align:middle;';
+  const TD  = 'padding:14px 18px;border-top:1px solid #edf1f4;font-size:15px;color:#1f2933;vertical-align:middle;';
+  const TH  = 'background:#2c3e50;color:#ffffff;text-align:left;padding:14px 18px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact;';
+
   const salesTableBody = salesRows.length > 0
     ? salesRows.map(row => `
         <tr>
@@ -470,30 +423,6 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
           <td style="${TD}">${row.bathrooms != null ? esc(String(row.bathrooms)) : '—'}</td>
         </tr>`).join('')
     : `<tr><td colspan="5" style="${TD}color:#aaa;font-style:italic;">No sales data available yet.</td></tr>`;
-
-  // ── Market Positioning ────────────────────────────────────────────────────
-  const positioningHtml = hasPositioning ? `
-    <section class="section section-soft" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#f4f6f8;">
-      <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Market Positioning</span>
-      <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#1f2933;font-weight:700;">Where your budget sits</h2>
-    </section>` : '';
-
-  // ── Market Examples ───────────────────────────────────────────────────────
-  const salesExamplesHtml = hasSalesExamples ? `
-    <section class="section" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#ffffff;">
-      <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Market Examples</span>
-      <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#1f2933;font-weight:700;">Recent sales shaping this report</h2>
-      <div style="display:flex;gap:18px;margin-top:24px;">
-        ${salesExamples.slice(0, 3).map(sale => `
-          <div class="card" style="flex:1;min-width:0;min-height:180px;display:flex;flex-direction:column;justify-content:space-between;background:#ffffff;border:1px solid #d9e0e7;border-radius:24px;padding:28px;">
-            <div>
-              <p style="font-size:20px;font-weight:800;letter-spacing:-0.03em;color:#2c3e50;margin-bottom:10px;margin-top:0;">${v(sale.address)}</p>
-              <p style="color:#6b7280;font-size:14px;margin-bottom:16px;margin-top:0;">${v(sale.meta)}</p>
-            </div>
-            <p style="font-size:24px;font-weight:800;letter-spacing:-0.03em;color:#2c3e50;margin:0;">${v(sale.price)}</p>
-          </div>`).join('')}
-      </div>
-    </section>` : '';
 
   // ── Strategic Pathways ────────────────────────────────────────────────────
   const pathwaysHtml = hasPathways ? `
@@ -520,9 +449,10 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
       </div>
     </section>` : '';
 
-  // ── Assemble ──────────────────────────────────────────────────────────────
-  const TH = 'background:#2c3e50;color:#ffffff;text-align:left;padding:14px 18px;font-size:12px;letter-spacing:0.12em;text-transform:uppercase;font-weight:700;white-space:nowrap;';
+  // ── Footer evidence note ──────────────────────────────────────────────────
+  const footerNote = `This report is based on ${salesCount} comparable sale${salesCount !== 1 ? 's' : ''}. All figures are market evidence only and do not constitute financial or investment advice.`;
 
+  // ── Assemble ──────────────────────────────────────────────────────────────
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -531,53 +461,84 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   <title>PDR — ${esc(clientName)}</title>
   <style>${CSS}</style>
 </head>
-<body style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#1f2933;background:#f0f2f5;margin:0;padding:0;">
-  <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:28px;overflow:hidden;border:1px solid #e5ebf0;">
+<body style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#1f2933;background:#ffffff;margin:0;padding:0;">
+  <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e5ebf0;">
 
-    <section class="hero" style="background:linear-gradient(180deg,#2c3e50 0%,#22313f 100%);color:#ffffff;padding:40px 44px 48px;">
-      <div class="hero-top" style="margin-bottom:36px;">${logoHtml}</div>
-      <div class="hero-grid" style="display:flex;gap:32px;align-items:flex-end;">
-        <div style="flex:1.4;min-width:0;">
-          <div class="kicker" style="font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;opacity:0.78;margin-bottom:18px;margin-top:0;color:#ffffff;">Price Discovery Report</div>
-          <h1 style="font-size:48px;line-height:0.98;letter-spacing:-0.04em;margin-bottom:14px;margin-top:0;color:#ffffff;font-weight:800;">${v(clientName)}</h1>
-          <p class="hero-sub" style="font-size:15px;color:rgba(255,255,255,0.82);max-width:680px;margin:0;">${heroSubParts || '—'}</p>
-        </div>
-        <div class="hero-meta" style="flex:0.8;min-width:0;display:flex;flex-direction:column;gap:12px;">
-          <div class="meta-card" style="border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:16px 18px;background:rgba(255,255,255,0.05);">
-            <div class="meta-label" style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;opacity:0.7;margin-bottom:6px;margin-top:0;color:#ffffff;">Budget</div>
-            <div class="meta-value" style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;margin:0;">${v(budgetDisplay)}</div>
-          </div>
-          <div class="meta-card" style="border:1px solid rgba(255,255,255,0.16);border-radius:18px;padding:16px 18px;background:rgba(255,255,255,0.05);">
-            <div class="meta-label" style="font-size:11px;text-transform:uppercase;letter-spacing:0.14em;opacity:0.7;margin-bottom:6px;margin-top:0;color:#ffffff;">Report Outcome</div>
-            <div class="meta-value" style="font-size:20px;font-weight:700;letter-spacing:-0.02em;color:#ffffff;margin:0;">${v(outcomeSummary)}</div>
-          </div>
-        </div>
+    <!-- Block 1: Compact dark header -->
+    <div style="background:#0b2545;padding:18px 36px;display:flex;align-items:center;justify-content:space-between;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        ${logoHtml}
+        <span style="font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.75);">Price Discovery Report</span>
       </div>
-    </section>
-
-    <section class="section" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#ffffff;">
-      <div class="statement-grid" style="display:flex;gap:30px;align-items:stretch;">
-        <div class="card" style="flex:1.15;min-width:0;background:#ffffff;border:1px solid #d9e0e7;border-radius:24px;padding:28px;">
-          <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Position Summary</span>
-          <h2 style="font-size:34px;line-height:1.04;letter-spacing:-0.03em;color:#2c3e50;margin-bottom:14px;margin-top:0;font-weight:800;">${v(heroStatement)}</h2>
-          <p style="color:#6b7280;font-size:16px;margin:0;">${v(viabilitySummary)}</p>
-        </div>
-        <div class="brief" style="flex:0.85;min-width:0;background:#f8fafb;border:1px solid #d9e0e7;border-radius:24px;padding:24px;">
-          <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Submitted Brief</span>
-          <div class="brief-grid" style="display:flex;flex-wrap:wrap;gap:16px 22px;margin-top:12px;">
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Location</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(locations)}</span></div>
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Property Type</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(propertyTypes)}</span></div>
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Bedrooms</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(bedrooms)}</span></div>
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Bathrooms</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(bathrooms)}</span></div>
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Purpose</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(purpose)}</span></div>
-            <div style="flex:1 1 320px;min-width:240px;"><span class="brief-label" style="display:block;font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:6px;font-weight:700;">Rental Yield</span><span class="brief-value" style="font-size:17px;font-weight:700;color:#2c3e50;letter-spacing:-0.02em;display:block;">${v(rentalYield)}</span></div>
-          </div>
-        </div>
+      <div style="text-align:right;">
+        <div style="font-size:18px;font-weight:700;color:#ffffff;">${v(clientName)}</div>
+        ${heroSubParts ? `<div style="font-size:13px;color:rgba(255,255,255,0.72);margin-top:3px;">${heroSubParts}</div>` : ''}
       </div>
-    </section>
+    </div>
 
-    ${positioningHtml}
-    ${salesExamplesHtml}
+    <!-- Block 2: Intro strip -->
+    <div style="background:#f3f5f7;padding:14px 36px;border-bottom:1px solid #dde2e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+      <p style="font-size:14px;color:#374151;margin:0;">${introSentence}</p>
+    </div>
+
+    <!-- Block 3: 2-column Submitted Brief + Position Summary -->
+    <div style="padding:28px 36px;display:flex;gap:24px;align-items:flex-start;">
+      <div style="flex:0 0 340px;min-width:0;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;padding:20px 22px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">Submitted Brief</div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Location</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(locations)}</span></div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Property Type</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(propertyTypes)}</span></div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Bedrooms</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(bedrooms)}</span></div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Bathrooms</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(bathrooms)}</span></div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Purpose</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(purpose)}</span></div>
+        <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
+      </div>
+      <div style="flex:1;min-width:0;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
+        <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
+        <div style="font-size:26px;font-weight:700;color:#0b2545;line-height:1.15;margin-bottom:10px;">${v(heroStatement)}</div>
+        <div style="font-size:14px;color:#6b7280;line-height:1.6;">${v(viabilitySummary)}</div>
+      </div>
+    </div>
+
+    <!-- Block 4: 3 KPI cards -->
+    <div style="padding:0 36px 24px;display:flex;gap:16px;">
+      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Median Sale Price</div>
+        <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${medianPrice != null ? fmtMoney(medianPrice) : '—'}</div>
+        <div style="font-size:12px;color:#9ca3af;">${esc(medianAlignmentLabel || 'Market midpoint')}</div>
+      </div>
+      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Budget vs Median</div>
+        <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${budgetVsMedian != null ? fmtMoney(Math.abs(budgetVsMedian)) : '—'}</div>
+        <div style="font-size:12px;color:#9ca3af;">${budgetVsMedianPct != null ? Math.abs(budgetVsMedianPct) + '% ' + budgetVsDirection + ' median' : '—'}</div>
+      </div>
+      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordable Sales</div>
+        <div style="font-size:28px;font-weight:800;color:#0b2545;line-height:1.1;margin-bottom:6px;">${affordableCount}</div>
+        <div style="font-size:12px;color:#9ca3af;">${affordablePct != null ? affordablePct + '% of comparable sales' : 'within budget'}</div>
+      </div>
+    </div>
+
+    <!-- Block 5: Price Position Snapshot -->
+    <div style="padding:0 36px 28px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:14px;">Price Position Snapshot</div>
+      ${rangeBarHtml}
+      ${sparkHtml}
+    </div>
+
+    <!-- Block 6: Affordability Snapshot -->
+    <div style="padding:0 36px 28px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordability Snapshot</div>
+      ${affordBarHtml}
+    </div>
+
+    <!-- Block 7: Best-Fit Affordable Property Example (omitted if null) -->
+    ${bestFitHtml}
+
+    <!-- Block 8: Footer evidence note -->
+    <div style="padding:14px 36px 28px;border-top:1px solid #edf1f4;">
+      <p style="font-size:12px;color:#9ca3af;font-style:italic;margin:0;">${footerNote}</p>
+    </div>
+
     ${strategiesHtml}
     ${pathwaysHtml}
 
