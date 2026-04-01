@@ -2418,6 +2418,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
   const [salesWarnings,     setSalesWarnings]      = useState([]);
   const [salesUploadStatus, setSalesUploadStatus]  = useState('idle'); // 'idle'|'uploading'|'done'|'error'
   const [salesUploadError,  setSalesUploadError]   = useState('');
+  const [bestFitImageUrl,   setBestFitImageUrl]    = useState('');
   const [salesLoading,      setSalesLoading]       = useState(false);
 
   // Load stored CSV whenever selected request (or its stored path) changes
@@ -2578,6 +2579,11 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
       }, salesRows);
       if (!report) throw new Error('Could not build report data.');
+
+      // Inject manually-entered image URL for the best-fit property
+      if (report.bestFitProperty && bestFitImageUrl.trim()) {
+        report.bestFitProperty.imageUrl = bestFitImageUrl.trim();
+      }
 
       // 2. Render HTML string — single source for both HTML file and PDF
       const logoUrl = window.location.origin + '/' + encodeURIComponent('No BG, Light Text.png');
@@ -2829,12 +2835,18 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
             </div>
 
             {previewMode
-              ? <PdrReportPreview report={buildPdrReportData({
-                  ...selected,
-                  heroStatement:    ful.hero_statement    || selected.heroStatement,
-                  viabilitySummary: ful.viability_summary || selected.viabilitySummary,
-                  supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
-                }, salesRows)} />
+              ? (() => {
+                  const r = buildPdrReportData({
+                    ...selected,
+                    heroStatement:    ful.hero_statement    || selected.heroStatement,
+                    viabilitySummary: ful.viability_summary || selected.viabilitySummary,
+                    supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
+                  }, salesRows);
+                  if (r?.bestFitProperty && bestFitImageUrl.trim()) {
+                    r.bestFitProperty.imageUrl = bestFitImageUrl.trim();
+                  }
+                  return <PdrReportPreview report={r} />;
+                })()
               : <>
 
             {/* ── Section 1: Submitted Brief ───────────────────────────── */}
@@ -2922,6 +2934,20 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
                   {salesWarnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
               )}
+            </div>
+
+            <div style={{marginTop:12}}>
+              <label className="form-label">Best-Fit Property Image URL</label>
+              <input
+                type="url"
+                value={bestFitImageUrl}
+                onChange={e => setBestFitImageUrl(e.target.value)}
+                placeholder="https://..."
+                style={{display:'block', width:'100%', marginBottom:4}}
+              />
+              <span style={{fontSize:12, color:'#aaa'}}>
+                Paste a direct image URL for the best-fit property photo in the PDF.
+              </span>
             </div>
 
             <div className="divider" />
