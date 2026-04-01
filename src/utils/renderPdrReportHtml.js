@@ -212,6 +212,32 @@ const CSS = `
       print-color-adjust: exact;
     }
   }
+
+  /* ── PDF page-break control ─────────────────────────────────────────────────
+     pdf-render is always present on <body> in the standalone HTML sent to
+     Playwright. break-before:page has zero effect in a normal browser scroll
+     view — it only fires in paged/PDF contexts — so the HTML view is unchanged.
+  ── */
+
+  /* HTML/browser: no forced break */
+  .pdf-page-2-start {
+    break-before: auto;
+    page-break-before: auto;
+  }
+
+  /* PDF-only: first strategy section always starts on a fresh page */
+  .pdf-render .pdf-page-2-start {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* Reduce internal fragmentation inside strategy sections during PDF pagination */
+  .pdf-render .section-dark,
+  .pdf-render .strategy-callout,
+  .pdf-render .metric {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 `;
 
 // ---------------------------------------------------------------------------
@@ -395,10 +421,12 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   }
 
   // ── Strategies ────────────────────────────────────────────────────────────
-  const strategiesHtml = strategies.map(s => {
+  const strategiesHtml = strategies.map((s, i) => {
     const label = esc(STRATEGY_LABELS[s.strategyType] || s.strategyType || 'Strategic Pathway');
+    // First strategy always starts on page 2 in the PDF (class has no effect in browser scroll view)
+    const pageBreakClass = i === 0 ? ' pdf-page-2-start' : '';
     return `
-    <section class="section section-dark" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+    <section class="section section-dark${pageBreakClass}" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <span class="eyebrow" style="display:inline-block;margin-bottom:16px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
       <div style="display:flex;gap:24px;margin-top:0;align-items:flex-start;">
         <div class="strategy-callout" style="flex:1.1;min-width:0;align-self:flex-start;height:auto;overflow:visible;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
@@ -475,7 +503,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   <title>PDR — ${esc(clientName)}</title>
   <style>${CSS}</style>
 </head>
-<body style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#1f2933;background:#ffffff;margin:0;padding:0;">
+<body class="pdf-render" style="font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#1f2933;background:#ffffff;margin:0;padding:0;">
   <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:visible;border:1px solid #e5ebf0;">
 
     <!-- Block 1: Compact dark header -->
