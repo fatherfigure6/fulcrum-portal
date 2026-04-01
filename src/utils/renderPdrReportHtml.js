@@ -494,7 +494,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
       </div>
       <div style="flex:1;min-width:0;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
         <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
-        <div style="font-size:26px;font-weight:700;color:#0b2545;line-height:1.15;margin-bottom:10px;">${v(heroStatement)}</div>
+        <div style="font-size:14px;font-weight:700;color:#0b2545;line-height:1.6;margin-bottom:10px;">${v(heroStatement)}</div>
         <div style="font-size:14px;color:#6b7280;line-height:1.6;">${v(viabilitySummary)}</div>
       </div>
     </div>
