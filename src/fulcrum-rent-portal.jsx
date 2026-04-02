@@ -2469,16 +2469,24 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
   }, [selected?.id, selected?.salesCsvFilePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function isRedFill(cell) {
-    const color = cell?.s?.fgColor;
-    if (!color) return false;
-    if (color.rgb) {
-      const hex = color.rgb.replace(/^FF/i, '').padStart(6, '0').toUpperCase();
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return r > 180 && g < 100 && b < 100;
+    const style = cell?.s;
+    if (!style) return false;
+    // Check both fgColor (solid fill) and bgColor
+    for (const key of ['fgColor', 'bgColor']) {
+      const color = style[key];
+      if (!color) continue;
+      if (color.rgb) {
+        // SheetJS stores as 8-char AARRGGBB or 6-char RRGGBB — handle both
+        const rgb = color.rgb.length === 8 ? color.rgb.slice(2) : color.rgb;
+        const r = parseInt(rgb.slice(0, 2), 16);
+        const g = parseInt(rgb.slice(2, 4), 16);
+        const b = parseInt(rgb.slice(4, 6), 16);
+        if (r > 180 && g < 100 && b < 100) return true;
+      }
+      if (color.indexed === 10) return true; // Excel indexed red
+      // Theme index 1 = Accent 2 = red in default Office theme
+      if (color.theme === 1 && (color.tint == null || Math.abs(color.tint) < 0.15)) return true;
     }
-    if (color.indexed === 10) return true; // Excel indexed red
     return false;
   }
 
@@ -2500,29 +2508,39 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         const wb  = XLSX.read(buf, { type: 'array', cellStyles: true });
         const ws  = wb.Sheets[wb.SheetNames[0]];
 
-        // Find first red-highlighted data row; capture address from first column for matching
-        let redRowAddress = null;
+        // Find first red-highlighted data row by index (0-based, excluding header)
+        let redDataRowIndex = null;
         const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
         outer:
         for (let r = range.s.r + 1; r <= range.e.r; r++) {
           for (let c = range.s.c; c <= range.e.c; c++) {
             const cell = ws[XLSX.utils.encode_cell({ r, c })];
             if (cell && isRedFill(cell)) {
-              const addrCell = ws[XLSX.utils.encode_cell({ r, c: range.s.c })];
-              redRowAddress = addrCell?.v != null ? String(addrCell.v).trim() : null;
+              redDataRowIndex = r - range.s.r - 1;
+              console.log('[nomination] Red row found at data index', redDataRowIndex, '| cell:', XLSX.utils.encode_cell({r,c}), '| style:', JSON.stringify(cell.s));
               break outer;
             }
           }
+        }
+        if (redDataRowIndex === null) {
+          // Log first few cells to help diagnose missing styles
+          for (let r = range.s.r + 1; r <= Math.min(range.s.r + 3, range.e.r); r++) {
+            for (let c = range.s.c; c <= Math.min(range.s.c + 2, range.e.c); c++) {
+              const cell = ws[XLSX.utils.encode_cell({ r, c })];
+              if (cell) console.log('[nomination] Sample cell', XLSX.utils.encode_cell({r,c}), '| s:', JSON.stringify(cell.s), '| v:', cell.v);
+            }
+          }
+          console.log('[nomination] No red row detected');
         }
 
         text = XLSX.utils.sheet_to_csv(ws);
         parsed = parseSalesCsv(text);
 
-        // Match nominated row by address string
-        if (redRowAddress) {
-          const norm = redRowAddress.toLowerCase();
-          const match = parsed.rows.find(row => row.address?.toLowerCase() === norm);
-          setNominatedRow(match ?? null);
+        // Index-based match — direct and reliable regardless of address format
+        if (redDataRowIndex !== null) {
+          const match = parsed.rows[redDataRowIndex] ?? null;
+          console.log('[nomination] Matched row:', match?.address ?? 'no match (index out of range)');
+          setNominatedRow(match);
         } else {
           setNominatedRow(null);
         }
