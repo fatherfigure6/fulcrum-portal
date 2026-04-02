@@ -387,9 +387,9 @@ export default function App() {
         setIsLoading(false);
         if (profile.mustChangePassword) {
           navigate("/change-password", { replace: true });
-        } else if (!isInitialLoad.current && !wasLoggedIn.current) {
-          // Only navigate on a genuine fresh login (session was not previously active).
-          // Skips navigation on token refreshes and tab-switch reconnects.
+        } else if (['/login', '/'].includes(window.location.pathname)) {
+          // Navigate to dashboard only if currently on the login page.
+          // Prevents unwanted redirects on tab-switch reconnects or token refreshes.
           const intendedPath = location.state?.from?.pathname;
           const safe = intendedPath && !AUTH_ONLY_PATHS.includes(intendedPath) ? intendedPath : "/dashboard";
           navigate(safe, { replace: true });
