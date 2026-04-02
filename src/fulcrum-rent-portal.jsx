@@ -2424,6 +2424,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
   const [salesUploadStatus, setSalesUploadStatus]  = useState('idle'); // 'idle'|'uploading'|'done'|'error'
   const [salesUploadError,  setSalesUploadError]   = useState('');
   const [bestFitImageUrl,   setBestFitImageUrl]    = useState('');
+  const [nominatedRow,      setNominatedRow]       = useState(null);
   const [salesLoading,      setSalesLoading]       = useState(false);
 
   // Load stored CSV whenever selected request (or its stored path) changes
@@ -2467,6 +2468,20 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
     return () => { cancelled = true; };
   }, [selected?.id, selected?.salesCsvFilePath]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  function isRedFill(cell) {
+    const color = cell?.s?.fgColor;
+    if (!color) return false;
+    if (color.rgb) {
+      const hex = color.rgb.replace(/^FF/i, '').padStart(6, '0').toUpperCase();
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return r > 180 && g < 100 && b < 100;
+    }
+    if (color.indexed === 10) return true; // Excel indexed red
+    return false;
+  }
+
   const handleCsvUpload = async (file) => {
     setSalesUploadError('');
     if (!file) return;
@@ -2482,12 +2497,40 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       let text;
       if (isXlsx) {
         const buf = await file.arrayBuffer();
-        const wb  = XLSX.read(buf, { type: 'array' });
-        text = XLSX.utils.sheet_to_csv(wb.Sheets[wb.SheetNames[0]]);
+        const wb  = XLSX.read(buf, { type: 'array', cellStyles: true });
+        const ws  = wb.Sheets[wb.SheetNames[0]];
+
+        // Find first red-highlighted data row; capture address from first column for matching
+        let redRowAddress = null;
+        const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+        outer:
+        for (let r = range.s.r + 1; r <= range.e.r; r++) {
+          for (let c = range.s.c; c <= range.e.c; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r, c })];
+            if (cell && isRedFill(cell)) {
+              const addrCell = ws[XLSX.utils.encode_cell({ r, c: range.s.c })];
+              redRowAddress = addrCell?.v != null ? String(addrCell.v).trim() : null;
+              break outer;
+            }
+          }
+        }
+
+        text = XLSX.utils.sheet_to_csv(ws);
+        parsed = parseSalesCsv(text);
+
+        // Match nominated row by address string
+        if (redRowAddress) {
+          const norm = redRowAddress.toLowerCase();
+          const match = parsed.rows.find(row => row.address?.toLowerCase() === norm);
+          setNominatedRow(match ?? null);
+        } else {
+          setNominatedRow(null);
+        }
       } else {
         text = await file.text();
+        parsed = parseSalesCsv(text);
+        setNominatedRow(null); // CSV uploads clear any nomination
       }
-      parsed = parseSalesCsv(text);
     } catch (err) {
       setSalesUploadError(err.message || 'File parse failed.');
       return;
@@ -2585,7 +2628,20 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       }, salesRows);
       if (!report) throw new Error('Could not build report data.');
 
-      // Inject manually-entered image URL for the best-fit property
+      // Nominated row (red-highlighted in xlsx) overrides auto-selection
+      if (nominatedRow) {
+        report.bestFitProperty = {
+          address:   nominatedRow.address   || null,
+          suburb:    nominatedRow.suburb    || null,
+          state:     nominatedRow.state     || null,
+          postcode:  nominatedRow.postcode  || null,
+          salePrice: nominatedRow.salePrice || null,
+          beds:      nominatedRow.bedrooms  ?? null,
+          baths:     nominatedRow.bathrooms ?? null,
+          cars: null, landSize: null, floorSize: null, yearBuilt: null, imageUrl: null,
+        };
+      }
+      // Image URL applies on top of whichever property was selected
       if (report.bestFitProperty && bestFitImageUrl.trim()) {
         report.bestFitProperty.imageUrl = bestFitImageUrl.trim();
       }
@@ -2847,6 +2903,18 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
                     viabilitySummary: ful.viability_summary || selected.viabilitySummary,
                     supportingNotes:  ful.supporting_notes  || selected.supportingNotes,
                   }, salesRows);
+                  if (r && nominatedRow) {
+                    r.bestFitProperty = {
+                      address:   nominatedRow.address   || null,
+                      suburb:    nominatedRow.suburb    || null,
+                      state:     nominatedRow.state     || null,
+                      postcode:  nominatedRow.postcode  || null,
+                      salePrice: nominatedRow.salePrice || null,
+                      beds:      nominatedRow.bedrooms  ?? null,
+                      baths:     nominatedRow.bathrooms ?? null,
+                      cars: null, landSize: null, floorSize: null, yearBuilt: null, imageUrl: null,
+                    };
+                  }
                   if (r?.bestFitProperty && bestFitImageUrl.trim()) {
                     r.bestFitProperty.imageUrl = bestFitImageUrl.trim();
                   }
@@ -2938,6 +3006,13 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
                 <ul style={{color:'#f0a500', fontSize:12, margin:'4px 0 0 16px', padding:0}}>
                   {salesWarnings.map((w, i) => <li key={i}>{w}</li>)}
                 </ul>
+              )}
+              {nominatedRow && (
+                <div style={{marginTop:6, fontSize:12, color:'#7cfc00', display:'flex', alignItems:'center', gap:8}}>
+                  <span>★ Nominated: {nominatedRow.address}</span>
+                  <button className="btn btn-secondary btn-sm" style={{fontSize:11, padding:'1px 8px'}}
+                    onClick={() => setNominatedRow(null)}>Clear</button>
+                </div>
               )}
             </div>
 
