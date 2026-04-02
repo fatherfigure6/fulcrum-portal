@@ -455,7 +455,7 @@ export default function App() {
       if (event === "PASSWORD_RECOVERY") { recovering.current = true; navigate("/reset-password"); return; }
       if (event === "USER_UPDATED") { recovering.current = false; return; }
       if (event === "TOKEN_REFRESHED") return; // silent refresh — do not re-navigate
-      if (event === "SIGNED_OUT") { recovering.current = false; setSession(null); setIsLoading(false); navigate("/login"); return; }
+      if (event === "SIGNED_OUT") { recovering.current = false; wasLoggedIn.current = false; setSession(null); setIsLoading(false); navigate("/login"); return; }
       if (registering.current) return;
       void resolveAuth(authSession);
     });
