@@ -3226,18 +3226,31 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
               )}
 
               {(reportHtmlUrl || reportPdfUrl) && (
-                <div style={{display:'flex', gap:12, flexWrap:'wrap', marginTop:4}}>
+                <div style={{marginTop:4}}>
+                  <div style={{display:'flex', gap:12, flexWrap:'wrap', marginBottom:10}}>
+                    {reportHtmlUrl && (
+                      <a href={`${window.location.origin}/api/report?id=${selected.id}`} target="_blank" rel="noreferrer"
+                        className="btn btn-secondary btn-sm">
+                        Open HTML Report
+                      </a>
+                    )}
+                    {reportPdfUrl && (
+                      <a href={reportPdfUrl} download={`pdr-${selected.id}.pdf`}
+                        className="btn btn-secondary btn-sm">
+                        Download PDF
+                      </a>
+                    )}
+                  </div>
                   {reportHtmlUrl && (
-                    <a href={reportHtmlUrl} target="_blank" rel="noreferrer"
-                      className="btn btn-secondary btn-sm">
-                      Open HTML Report
-                    </a>
-                  )}
-                  {reportPdfUrl && (
-                    <a href={reportPdfUrl} download={`pdr-${selected.id}.pdf`}
-                      className="btn btn-secondary btn-sm">
-                      Download PDF
-                    </a>
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      <input
+                        readOnly
+                        value={`${window.location.origin}/api/report?id=${selected.id}`}
+                        style={{fontSize:12, color:'#555', background:'#f5f7fa', border:'1px solid var(--border)', borderRadius:6, padding:'4px 8px', flex:1, minWidth:0}}
+                        onFocus={e => e.target.select()}
+                      />
+                      <button className="btn btn-secondary btn-sm" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/report?id=${selected.id}`)}>Copy</button>
+                    </div>
                   )}
                 </div>
               )}
