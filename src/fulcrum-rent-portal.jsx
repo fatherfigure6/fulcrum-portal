@@ -227,7 +227,7 @@ const AUTH_ONLY_PATHS = ["/login", "/register", "/forgot-password", "/reset-pass
 const ROUTES = [
   { path: "/dashboard",     label: "Dashboard",         crumbParent: null },
   { path: "/rent-requests", label: "Rent Requests",     crumbParent: "/dashboard" },
-  { path: "/cma-requests",  label: "CMA Requests",      crumbParent: "/dashboard" },
+  { path: "/price-check-requests",  label: "Price Check Requests",      crumbParent: "/dashboard" },
   { path: "/pdr-reports",   label: "PD Reports",        crumbParent: "/dashboard" },
   { path: "/referrals",     label: "Referrals",         crumbParent: "/dashboard" },
   { path: "/brokers",       label: "Broker Management", crumbParent: "/dashboard" },
@@ -691,7 +691,7 @@ export default function App() {
     }
     if (rpcResult?.error) throw rpcResult.error;
 
-    const typeLabel = data.type === "rent" ? "Rent Letter" : data.type === "cma" ? "CMA" : data.type === "referral" ? "Client Referral" : "PDR";
+    const typeLabel = data.type === "rent" ? "Rent Letter" : data.type === "cma" ? "Price Check" : data.type === "referral" ? "Client Referral" : "PDR";
     const message = data.type === "referral"
       ? `A new client referral has been submitted.\n\nReferring Broker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\n\nClient Name: ${data.clientName}\nClient Email: ${data.clientEmail}\nClient Mobile: ${data.clientMobile || "—"}\n\nSituation:\n${data.situation}\n\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review this referral.`
       : `A new ${typeLabel} request has been submitted.\n\nBroker: ${session.name}\nCompany: ${session.company}\nEmail: ${session.email}\nAddress: ${data.address || "—"}\nSubmitted: ${new Date().toLocaleString("en-AU")}\n\nLog in to the portal to review and complete this request.`;
@@ -774,7 +774,7 @@ export default function App() {
               ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="rent" />
               : <Navigate to="/dashboard" replace />
           } />
-          <Route path="cma-requests" element={
+          <Route path="price-check-requests" element={
             session?.role === "staff"
               ? <AdminRequests requests={cmaReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="cma" />
               : <Navigate to="/dashboard" replace />
@@ -1058,7 +1058,7 @@ function AppShell({ session, onLogout, requests, users }) {
     { section:"Rent Letters" },
     { path:"/rent-requests", icon:"📋", label:"Rent Requests", badge:pendingRent },
     { section:"Market Analysis" },
-    { path:"/cma-requests",  icon:"🏡", label:"CMA Requests",  badge:pendingCMA  },
+    { path:"/price-check-requests",  icon:"🏡", label:"Price Check Requests",  badge:pendingCMA  },
     { section:"Price Discovery" },
     { path:"/pdr-reports",   icon:"🔍", label:"PD Reports",    badge:pendingPDR },
     { section:"Referrals" },
@@ -1141,7 +1141,7 @@ function AdminDashboard({ requests, users }) {
       <div className="stats">
         <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total Requests</div></div>
         <div className="stat"><div className="stat-num gold">{rentPending.length}</div><div className="stat-label">Rent Pending</div></div>
-        <div className="stat"><div className="stat-num teal">{cmaPending.length}</div><div className="stat-label">CMA Pending</div></div>
+        <div className="stat"><div className="stat-num teal">{cmaPending.length}</div><div className="stat-label">Price Checks Pending</div></div>
         <div className="stat"><div className="stat-num green">{complete.length}</div><div className="stat-label">Completed</div></div>
         <div className="stat"><div className="stat-num" style={{color:"var(--indigo)"}}>{requests.filter(r=>r.type==="pdr"&&r.status==="pending").length}</div><div className="stat-label">PDR Pending</div></div>
         <div className="stat"><div className="stat-num" style={{color:"#7a4a00"}}>{requests.filter(r=>r.type==="referral"&&r.status==="pending").length}</div><div className="stat-label">Referrals</div></div>
@@ -1160,7 +1160,7 @@ function AdminDashboard({ requests, users }) {
           <div className="card-title" style={{margin:0}}>Recent Requests</div>
           <div className="row" style={{gap:8}}>
             <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/rent-requests")}>Rent Letters →</button>
-            <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/cma-requests")}>CMAs →</button>
+            <button className="btn btn-secondary btn-sm" onClick={()=>navigate("/price-check-requests")}>Price Checks →</button>
           </div>
         </div>
         <div className="req-table-wrap">
@@ -1209,7 +1209,7 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
   const markComplete = async req => {
     if (!uploadUrl.trim()) return alert("Please enter a download URL for the completed document.");
     await onUpdate(req.id, { status:"complete", completedAt:Date.now(), downloadUrl:uploadUrl.trim() });
-    const typeLabel = isRent ? "Rent Letter" : "CMA";
+    const typeLabel = isRent ? "Rent Letter" : "Price Check";
     sendEmail(EMAILJS_TEMPLATE_USER, {
       to_email: req.brokerEmail,
       subject: `Your ${typeLabel} Request is Complete — ${req.address || "Property"}`,
@@ -1221,8 +1221,8 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
   return (
     <>
       <div className="page-header">
-        <div className="page-title">{isRent?"Rent Letter Requests":"CMA Requests"}</div>
-        <div className="page-sub">{isRent?"Manage and complete rent letter requests":"Manage and complete comparative market analysis requests"}</div>
+        <div className="page-title">{isRent?"Rent Letter Requests":"Price Check Requests"}</div>
+        <div className="page-sub">{isRent?"Manage and complete rent letter requests":"Manage and complete Price Check requests"}</div>
       </div>
       <div className="card">
         <div className="row" style={{marginBottom:20,gap:8}}>
@@ -1269,7 +1269,7 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
       {selected && (
         <div className="overlay" onClick={e=>e.target===e.currentTarget&&setSelected(null)}>
           <div className="modal">
-            <div className="modal-title">{isRent?"Rent Letter":"CMA"} Request Details</div>
+            <div className="modal-title">{isRent?"Rent Letter":"Price Check"} Request Details</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px 24px",marginBottom:20}}>
               <Detail label="Broker"    val={selected.brokerName} />
               <Detail label="Company"   val={selected.brokerCompany} />
@@ -1287,7 +1287,7 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
               ? <div className="alert alert-success">✅ Marked complete! Broker has been notified.</div>
               : <>
                   <div className="field">
-                    <label>Download URL for Completed {isRent?"Letter":"CMA"}</label>
+                    <label>Download URL for Completed {isRent?"Letter":"Price Check"}</label>
                     <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="https://drive.google.com/... or similar" />
                     <div className="hint">Paste a shareable link to the completed PDF</div>
                   </div>
@@ -1666,7 +1666,7 @@ function BrokerDashboard({ session, requests }) {
       <div className="stats">
         <div className="stat"><div className="stat-num">{requests.length}</div><div className="stat-label">Total</div></div>
         <div className="stat"><div className="stat-num gold">{rentReqs.length}</div><div className="stat-label">Rent Letters</div></div>
-        <div className="stat"><div className="stat-num teal">{cmaReqs.length}</div><div className="stat-label">CMAs</div></div>
+        <div className="stat"><div className="stat-num teal">{cmaReqs.length}</div><div className="stat-label">Price Checks</div></div>
         <div className="stat"><div className="stat-num green">{complete.length}</div><div className="stat-label">Completed</div></div>
         <div className="stat"><div className="stat-num" style={{color:"#7a4a00"}}>{referralReqs.length}</div><div className="stat-label">Referrals</div></div>
       </div>
@@ -1739,7 +1739,7 @@ function NewRequest({ onSubmit, session }) {
         <p style={{color:"#888",lineHeight:1.7,marginBottom:24}}>
           {lastType==="referral"
             ? "Your client referral has been received. The Fulcrum Australia team will be in touch with your client shortly."
-            : <>Your {lastType==="rent"?"rent letter":lastType==="cma"?"comparative market analysis":"Price Discovery Report"} request has been received.<br/>You'll be notified as soon as your document is ready to download.</>
+            : <>Your {lastType==="rent"?"rent letter":lastType==="cma"?"Price Check":"Price Discovery Report"} request has been received.<br/>You'll be notified as soon as your document is ready to download.</>
           }
         </p>
         <div className="row" style={{justifyContent:"center",gap:12}}>
@@ -1764,8 +1764,8 @@ function NewRequest({ onSubmit, session }) {
             </div>
             <div className={`type-card${type==="cma"?" sel-cma":""}`} onClick={()=>setType("cma")}>
               <div className="type-card-icon">🏡</div>
-              <div className="type-card-title">Market Analysis</div>
-              <div className="type-card-desc">Comparative market analysis showing estimated current property value.</div>
+              <div className="type-card-title">Price Check</div>
+              <div className="type-card-desc">Current market value estimate for a property based on comparable sales.</div>
             </div>
             <div className={`type-card${type==="pdr"?" sel-purple":""}`} onClick={()=>setType("pdr")}>
               <div className="type-card-icon">🔍</div>
@@ -1781,7 +1781,7 @@ function NewRequest({ onSubmit, session }) {
         </div>
       )}
       {type==="rent"     && <RentForm     onSubmit={handleSubmit} onBack={()=>setType(null)} />}
-      {type==="cma"      && <CMAForm      onSubmit={handleSubmit} onBack={()=>setType(null)} />}
+      {type==="cma"      && <PriceCheckForm onSubmit={handleSubmit} onBack={()=>setType(null)} />}
       {type==="pdr"      && <PDRBrokerForm onSubmit={handleSubmit} onBack={()=>setType(null)} session={session} />}
       {type==="referral" && <ReferralForm  onSubmit={handleSubmit} onBack={()=>setType(null)} />}
     </div>
@@ -1836,7 +1836,7 @@ function RentForm({ onSubmit, onBack }) {
   );
 }
 
-function CMAForm({ onSubmit, onBack }) {
+function PriceCheckForm({ onSubmit, onBack }) {
   const INITIAL = { address:"", expectedValue:"", notes:"" };
   const [form, setForm, clearDraft] = useDraft('draft:new-request:cma', INITIAL);
   const [err,  setErr]  = useState("");
@@ -1854,7 +1854,7 @@ function CMAForm({ onSubmit, onBack }) {
   return (
     <div className="card" style={{marginTop:16}}>
       <div className="row-between" style={{marginBottom:16}}>
-        <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🏡 Market Analysis Request</div>
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:16,fontWeight:700,color:"var(--primary)"}}>🏡 Price Check Request</div>
         <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
@@ -1941,7 +1941,7 @@ function BrokerRequests({ requests }) {
   if (typeFilter !=="all") filtered = filtered.filter(r=>r.type===typeFilter);
   return (
     <>
-      <div className="page-header"><div className="page-title">My Requests</div><div className="page-sub">All your rent letter and CMA requests in one place</div></div>
+      <div className="page-header"><div className="page-title">My Requests</div><div className="page-sub">All your rent letter and Price Check requests in one place</div></div>
       <div className="card">
         <div className="row" style={{marginBottom:16,gap:10,flexWrap:"wrap"}}>
           <div className="row" style={{gap:6}}>
@@ -1951,7 +1951,7 @@ function BrokerRequests({ requests }) {
           </div>
           <div style={{width:1,height:24,background:"var(--border)"}} />
           <div className="row" style={{gap:6}}>
-            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 CMA"],["referral","🤝 Referral"]].map(([v,l])=>(
+            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 Price Check"],["referral","🤝 Referral"]].map(([v,l])=>(
               <button key={v} className="btn btn-secondary btn-sm" onClick={()=>setTypeFilter(v)}
                 style={{borderColor:typeFilter===v?"var(--primary)":"var(--border-strong)",fontWeight:typeFilter===v?700:400}}>{l}</button>
             ))}
@@ -2007,7 +2007,7 @@ function StatusBadge({ s }) {
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 function TypeBadge({ t }) {
-  if (t==="cma")      return <span className="badge badge-cma">🏡 CMA</span>;
+  if (t==="cma")      return <span className="badge badge-cma">🏡 Price Check</span>;
   if (t==="pdr")      return <span className="badge badge-pdr">🔍 PDR</span>;
   if (t==="referral") return <span className="badge badge-referral">🤝 Referral</span>;
   return <span className="badge badge-rent">📄 Rent</span>;
@@ -2731,6 +2731,10 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       } else if (pdfSigned.data?.signedUrl) {
         setReportPdfUrl(pdfSigned.data.signedUrl);
       }
+
+      // Auto-store permanent public viewer URL for broker-facing access
+      const viewerUrl = `${window.location.origin}/api/report?id=${selected.id}`;
+      await onUpdate(selected.id, { downloadUrl: viewerUrl });
 
       onRefresh();
     } catch (err) {

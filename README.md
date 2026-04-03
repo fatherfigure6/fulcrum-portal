@@ -2,7 +2,7 @@
 
 A Progressive Web App (PWA) for mortgage broker partners to request:
 - **Rent Letters** — rental yield confirmation
-- **CMAs** — comparative market analysis
+- **Price Checks** — current market value estimate based on comparable sales
 - **Price Discovery Reports** — client purchasing parameter intake
 
 ---
