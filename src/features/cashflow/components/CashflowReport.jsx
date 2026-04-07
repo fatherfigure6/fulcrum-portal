@@ -748,10 +748,6 @@ function ProjectionsPanel({ data, hasPI }) {
         </div>
       </div>
 
-      {/* Disclaimer */}
-      <div style={{ fontSize: 12, color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '14px 18px', lineHeight: 1.6 }}>
-        {DISCLAIMER}
-      </div>
     </section>
   );
 }
