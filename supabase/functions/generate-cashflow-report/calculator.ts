@@ -112,8 +112,15 @@ function inflate(base: number, year: number): number {
 }
 
 function annualDepreciation(inputs: InputsFinal, currentYear: number): number {
+  // Division 43 on renovation allowance applies to all property types (s43-10 ITAA 1997).
+  // Capital improvements to an income-producing property: 2.5%/yr over 40 years.
+  const renovationDep =
+    inputs.renovation_allowance && inputs.renovation_allowance > 0 && currentYear <= DIVISION_43_LIFE_YEARS
+      ? inputs.renovation_allowance * DIVISION_43_RATE
+      : 0;
+
   if (inputs.property_type === 'house') {
-    let dep = 0;
+    let dep = renovationDep;
     // Division 43 on build cost
     if (inputs.build_cost && inputs.build_year) {
       const yearsElapsed = (new Date().getFullYear() + currentYear - 1) - inputs.build_year;
@@ -132,8 +139,8 @@ function annualDepreciation(inputs: InputsFinal, currentYear: number): number {
     }
     return dep;
   }
-  // Non-house: use staff-entered depreciation allowance
-  return inputs.depreciation_allowance || 0;
+  // Non-house: staff-entered depreciation allowance + renovation Division 43
+  return (inputs.depreciation_allowance || 0) + renovationDep;
 }
 
 function resolvedStrataFees(inputs: InputsFinal): number {
