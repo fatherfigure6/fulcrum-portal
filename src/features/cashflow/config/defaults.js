@@ -22,9 +22,11 @@ export const DEFAULT_VACANCY_WEEKS = 4;     // weeks per year → 4/52 = 7.69...
 export const DEFAULT_VACANCY_RATE  = DEFAULT_VACANCY_WEEKS / 52;
 
 // Default purchasing cost estimates
-export const DEFAULT_CONVEYANCER        = 1000;
-export const DEFAULT_ANNUAL_MAINTENANCE = 1000;
-export const DEFAULT_ANNUAL_BANK_FEE    = 120;
+export const DEFAULT_CONVEYANCER           = 1000;
+export const DEFAULT_ANNUAL_MAINTENANCE    = 1000;
+export const DEFAULT_ANNUAL_BANK_FEE       = 120;
+export const DEFAULT_BUILDING_INSPECTION   = 350;  // fixed — not user-editable
+export const DEFAULT_PEST_INSPECTION       = 350;  // fixed — not user-editable
 
 // Report schema versioning
 export const SCHEMA_VERSION      = 1;

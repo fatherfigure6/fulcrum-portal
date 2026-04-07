@@ -31,24 +31,178 @@ import {
   DEFAULT_CONVEYANCER,
   DEFAULT_ANNUAL_MAINTENANCE,
   DEFAULT_ANNUAL_BANK_FEE,
+  DEFAULT_BUILDING_INSPECTION,
+  DEFAULT_PEST_INSPECTION,
 } from './defaults.js';
 
 // ── Section metadata ──────────────────────────────────────────────────────────
 
 export const STAFF_SECTIONS = [
+  { id: 'F', label: 'Lending details' },
   { id: 'P', label: 'Property details' },
   { id: 'A', label: 'Rental income & assumptions' },
   { id: 'B', label: 'Stamp duty & transfer costs' },
   { id: 'C', label: 'Ongoing property costs' },
   { id: 'D', label: 'Depreciation' },
   { id: 'E', label: 'Acquisition costs' },
-  { id: 'F', label: 'Lending details' },
   { id: 'G', label: 'Entity & buyers' },
 ];
 
 // ── Field definitions ─────────────────────────────────────────────────────────
 
 const staffFormConfig = [
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section F — Lending details (pre-filled from inputs_broker, editable)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id:           'purchase_price',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Purchase price',
+    hint:         'Pre-filled from broker submission. Edit only if the price has changed.',
+    required:     true,
+    defaultValue: null,
+    validation:   (v) => (Number(v) > 0) ? null : 'Purchase price must be greater than zero',
+    visibleWhen:  () => true,
+  },
+
+  {
+    id:           'deposit',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Deposit',
+    hint:         'Cash deposit amount. Enter 0 for no-deposit.',
+    required:     true,
+    defaultValue: 0,
+    validation:   (v) => (Number(v) >= 0) ? null : 'Deposit must be zero or greater',
+    visibleWhen:  () => true,
+  },
+
+  {
+    id:           'loan_type',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'select',
+    label:        'Loan type',
+    hint:         null,
+    required:     true,
+    defaultValue: null,
+    options: [
+      { value: 'pi',   label: 'Principal & Interest (P&I)' },
+      { value: 'io',   label: 'Interest Only (IO)' },
+      { value: 'both', label: 'Both — side-by-side comparison' },
+    ],
+    validation:   (v) => v ? null : 'Please select a loan type',
+    visibleWhen:  () => true,
+  },
+
+  {
+    id:           'pi_interest_rate',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'percentage',
+    label:        'P&I interest rate',
+    hint:         'Annual rate as a percentage, e.g. 5.89',
+    required:     true,
+    defaultValue: null,
+    validation:   (v) => (Number(v) > 0 && Number(v) < 30) ? null : 'Please enter a valid interest rate (0–30%)',
+    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'pi_loan_term',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'integer',
+    label:        'P&I loan term (years)',
+    hint:         null,
+    required:     true,
+    defaultValue: 30,
+    validation:   (v) => (Number(v) >= 1 && Number(v) <= 40) ? null : 'Loan term must be between 1 and 40 years',
+    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'pi_annual_fee',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Annual bank fee — P&I loan',
+    hint:         `Default $${DEFAULT_ANNUAL_BANK_FEE}. Enter 0 if none.`,
+    required:     false,
+    defaultValue: DEFAULT_ANNUAL_BANK_FEE,
+    validation:   (v) => (Number(v) >= 0) ? null : 'Bank fee must be zero or greater',
+    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'io_interest_rate',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'percentage',
+    label:        'IO interest rate',
+    hint:         'Annual rate as a percentage, e.g. 5.89',
+    required:     true,
+    defaultValue: null,
+    validation:   (v) => (Number(v) > 0 && Number(v) < 30) ? null : 'Please enter a valid interest rate (0–30%)',
+    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'io_loan_term',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'integer',
+    label:        'IO loan term (years)',
+    hint:         null,
+    required:     true,
+    defaultValue: 30,
+    validation:   (v) => (Number(v) >= 1 && Number(v) <= 40) ? null : 'Loan term must be between 1 and 40 years',
+    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'io_annual_fee',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Annual bank fee — IO loan',
+    hint:         'Enter 0 if none.',
+    required:     false,
+    defaultValue: DEFAULT_ANNUAL_BANK_FEE,
+    validation:   (v) => (Number(v) >= 0) ? null : 'Bank fee must be zero or greater',
+    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
+  },
+
+  {
+    id:           'establishment_fee',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Mortgage establishment fee',
+    hint:         'One-off fee to set up the loan. Tax-deductible, amortised over 5 years. Enter 0 if none.',
+    required:     false,
+    defaultValue: 0,
+    validation:   (v) => (Number(v) >= 0) ? null : 'Establishment fee must be zero or greater',
+    visibleWhen:  () => true,
+  },
+
+  {
+    id:           'lmi',
+    section:      'F',
+    sectionLabel: 'Lending details',
+    type:         'currency',
+    label:        'Lenders Mortgage Insurance (LMI)',
+    hint:         "Tax-deductible. Amortised over the loan term if above $100. Enter 0 if LVR ≤ 80%.",
+    required:     false,
+    defaultValue: 0,
+    validation:   (v) => (Number(v) >= 0) ? null : 'LMI must be zero or greater',
+    visibleWhen:  () => true,
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // Section P — Property details
@@ -414,32 +568,6 @@ const staffFormConfig = [
   },
 
   {
-    id:           'building_inspection',
-    section:      'E',
-    sectionLabel: 'Acquisition costs',
-    type:         'currency',
-    label:        'Building inspection fee',
-    hint:         'Optional. Enter 0 if none.',
-    required:     false,
-    defaultValue: 0,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Building inspection fee must be zero or greater',
-    visibleWhen:  () => true,
-  },
-
-  {
-    id:           'pest_inspection',
-    section:      'E',
-    sectionLabel: 'Acquisition costs',
-    type:         'currency',
-    label:        'Pest inspection fee',
-    hint:         'Optional. Enter 0 if none.',
-    required:     false,
-    defaultValue: 0,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Pest inspection fee must be zero or greater',
-    visibleWhen:  () => true,
-  },
-
-  {
     id:           'renovation_allowance',
     section:      'E',
     sectionLabel: 'Acquisition costs',
@@ -502,158 +630,6 @@ const staffFormConfig = [
     defaultValue: null,
     validation:   (v) => (v === null || v === '' || Number(v) >= 0) ? null : 'Amount must be zero or greater',
     visibleWhen:  (v) => !!(v.other_cost_2_label && v.other_cost_2_label.trim()),
-  },
-
-  // ══════════════════════════════════════════════════════════════════════════
-  // Section F — Lending details (pre-filled from inputs_broker, editable)
-  // ══════════════════════════════════════════════════════════════════════════
-
-  {
-    id:           'purchase_price',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Purchase price',
-    hint:         'Pre-filled from broker submission. Edit only if the price has changed.',
-    required:     true,
-    defaultValue: null,
-    validation:   (v) => (Number(v) > 0) ? null : 'Purchase price must be greater than zero',
-    visibleWhen:  () => true,
-  },
-
-  {
-    id:           'deposit',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Deposit',
-    hint:         'Cash deposit amount. Enter 0 for no-deposit.',
-    required:     true,
-    defaultValue: 0,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Deposit must be zero or greater',
-    visibleWhen:  () => true,
-  },
-
-  {
-    id:           'loan_type',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'select',
-    label:        'Loan type',
-    hint:         null,
-    required:     true,
-    defaultValue: null,
-    options: [
-      { value: 'pi',   label: 'Principal & Interest (P&I)' },
-      { value: 'io',   label: 'Interest Only (IO)' },
-      { value: 'both', label: 'Both — side-by-side comparison' },
-    ],
-    validation:   (v) => v ? null : 'Please select a loan type',
-    visibleWhen:  () => true,
-  },
-
-  {
-    id:           'pi_interest_rate',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'percentage',
-    label:        'P&I interest rate',
-    hint:         'Annual rate as a percentage, e.g. 5.89',
-    required:     true,
-    defaultValue: null,
-    validation:   (v) => (Number(v) > 0 && Number(v) < 30) ? null : 'Please enter a valid interest rate (0–30%)',
-    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'pi_loan_term',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'integer',
-    label:        'P&I loan term (years)',
-    hint:         null,
-    required:     true,
-    defaultValue: 30,
-    validation:   (v) => (Number(v) >= 1 && Number(v) <= 40) ? null : 'Loan term must be between 1 and 40 years',
-    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'pi_annual_fee',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Annual bank fee — P&I loan',
-    hint:         `Default $${DEFAULT_ANNUAL_BANK_FEE}. Enter 0 if none.`,
-    required:     false,
-    defaultValue: DEFAULT_ANNUAL_BANK_FEE,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Bank fee must be zero or greater',
-    visibleWhen:  (v) => v.loan_type === 'pi' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'io_interest_rate',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'percentage',
-    label:        'IO interest rate',
-    hint:         'Annual rate as a percentage, e.g. 5.89',
-    required:     true,
-    defaultValue: null,
-    validation:   (v) => (Number(v) > 0 && Number(v) < 30) ? null : 'Please enter a valid interest rate (0–30%)',
-    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'io_loan_term',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'integer',
-    label:        'IO loan term (years)',
-    hint:         null,
-    required:     true,
-    defaultValue: 30,
-    validation:   (v) => (Number(v) >= 1 && Number(v) <= 40) ? null : 'Loan term must be between 1 and 40 years',
-    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'io_annual_fee',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Annual bank fee — IO loan',
-    hint:         'Enter 0 if none.',
-    required:     false,
-    defaultValue: DEFAULT_ANNUAL_BANK_FEE,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Bank fee must be zero or greater',
-    visibleWhen:  (v) => v.loan_type === 'io' || v.loan_type === 'both',
-  },
-
-  {
-    id:           'establishment_fee',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Mortgage establishment fee',
-    hint:         'One-off fee to set up the loan. Tax-deductible, amortised over 5 years. Enter 0 if none.',
-    required:     false,
-    defaultValue: 0,
-    validation:   (v) => (Number(v) >= 0) ? null : 'Establishment fee must be zero or greater',
-    visibleWhen:  () => true,
-  },
-
-  {
-    id:           'lmi',
-    section:      'F',
-    sectionLabel: 'Lending details',
-    type:         'currency',
-    label:        'Lenders Mortgage Insurance (LMI)',
-    hint:         "Tax-deductible. Amortised over the loan term if above $100. Enter 0 if LVR ≤ 80%.",
-    required:     false,
-    defaultValue: 0,
-    validation:   (v) => (Number(v) >= 0) ? null : 'LMI must be zero or greater',
-    visibleWhen:  () => true,
   },
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -847,6 +823,10 @@ export function buildInputsFinal(staffValues, brokerInputs) {
       merged[id] = Number(merged[id]);
     }
   }
+
+  // Fixed acquisition costs — not user-editable
+  merged.building_inspection = DEFAULT_BUILDING_INSPECTION;
+  merged.pest_inspection     = DEFAULT_PEST_INSPECTION;
 
   // Normalise property_address: staff text input is a plain string;
   // calculator expects { formatted_address: string }
