@@ -58,12 +58,12 @@ const staffFormConfig = [
     id:           'property_address',
     section:      'P',
     sectionLabel: 'Property details',
-    type:         'places_autocomplete',
+    type:         'text',
     label:        'Property address',
-    hint:         'Start typing to search. Pre-filled from broker submission if available.',
+    hint:         'Full property address. Pre-filled from broker submission if available.',
     required:     true,
     defaultValue: null,
-    validation:   (v) => (v && v.formatted_address) ? null : 'Please select a property address',
+    validation:   (v) => (v && String(v).trim().length > 3) ? null : 'Please enter a property address',
     visibleWhen:  () => true,
   },
 
@@ -828,6 +828,12 @@ export function buildInputsFinal(staffValues, brokerInputs) {
     if (merged[id] !== null && merged[id] !== undefined && merged[id] !== '') {
       merged[id] = Number(merged[id]);
     }
+  }
+
+  // Normalise property_address: staff text input is a plain string;
+  // calculator expects { formatted_address: string }
+  if (typeof merged.property_address === 'string') {
+    merged.property_address = { formatted_address: merged.property_address.trim() };
   }
 
   return merged;

@@ -40,6 +40,11 @@ function buildInitialValues(inputsBroker) {
     }
   }
 
+  // Special case: property_address — broker supplies an object; text field needs a string
+  if (values['property_address'] && typeof values['property_address'] === 'object') {
+    values['property_address'] = values['property_address'].formatted_address || '';
+  }
+
   // Special case: strata_fees — pre-fill from strata_fees_known if broker supplied it
   if (inputsBroker?.strata_fees_known !== null && inputsBroker?.strata_fees_known !== undefined) {
     values['strata_fees'] = inputsBroker.strata_fees_known;
