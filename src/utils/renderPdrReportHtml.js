@@ -57,12 +57,20 @@ const CSS = `
   /* Prevent Playwright from splitting small data blocks across PDF page boundaries.
      Must be in screen-media CSS — PDF is generated with emulateMedia('screen').
      brief-position-row is excluded: it contains long narrative text and must break freely. */
-  .kpi-row,
+  .kpi-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    padding: 0 36px 24px;
+    display: flex;
+    gap: 16px;
+  }
+
   .snapshot-block,
   .affordability-block,
   .best-fit-block {
     break-inside: avoid;
     page-break-inside: avoid;
+    padding: 0 36px 28px;
   }
 
   .report {
@@ -149,7 +157,8 @@ const CSS = `
     margin-top: 24px;
     border: 1px solid #d9e0e7;
     border-radius: 20px;
-    overflow: hidden;
+    overflow-x: visible;
+    overflow-y: visible;
     background: #ffffff;
   }
 
@@ -237,6 +246,224 @@ const CSS = `
   .pdf-render .metric {
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  /* ── Layout classes — moved from inline so @media can override ───────────── */
+
+  /* Header */
+  .report-header {
+    background: #0b2545;
+    padding: 22px 36px;
+    display: flex;
+    align-items: center;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .report-header-logo {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+  }
+  .report-header-logo img {
+    max-width: 100%;
+    height: auto;
+  }
+  .report-header-title {
+    flex: 1;
+    text-align: center;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .report-header-name {
+    flex: 1;
+    text-align: right;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  /* Intro strip */
+  .intro-strip {
+    background: #f3f5f7;
+    padding: 14px 36px;
+    border-bottom: 1px solid #dde2e8;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Brief + Position row */
+  .brief-position-row {
+    padding: 28px 36px;
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+  }
+  .brief-col-left {
+    flex: 0 0 340px;
+    min-width: 0;
+    background: #f8fafc;
+    border: 1px solid #dde2e8;
+    border-radius: 14px;
+    padding: 20px 22px;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .brief-col-right {
+    flex: 1;
+    min-width: 0;
+    height: auto;
+    overflow: visible;
+    background: #ffffff;
+    border: 1px solid #dde2e8;
+    border-radius: 14px;
+    padding: 20px 24px;
+  }
+
+  /* KPI cards */
+  .kpi-card {
+    flex: 1;
+    min-width: 0;
+    background: #ffffff;
+    border: 1px solid #dde2e8;
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+
+  /* Strategy inner two-column */
+  .strategy-inner {
+    display: flex;
+    gap: 24px;
+    margin-top: 0;
+    align-items: flex-start;
+  }
+  .strategy-col-main {
+    flex: 1.1;
+    min-width: 0;
+    align-self: flex-start;
+    width: 100%;
+  }
+  .strategy-col-metrics {
+    flex: 0.9;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+  }
+
+  /* Pathways flex */
+  .pathways-flex {
+    display: flex;
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .pathway-card {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Best-fit card */
+  .best-fit-inner {
+    display: flex;
+    align-items: stretch;
+    background: #f8fafc;
+    border: 1px solid #dde2e8;
+    border-radius: 14px;
+    overflow: hidden;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .best-fit-image {
+    width: 273px;
+    height: 182px;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+    border-radius: 10px 0 0 10px;
+    flex-shrink: 0;
+  }
+  .best-fit-placeholder {
+    width: 273px;
+    height: 182px;
+    min-width: 273px;
+    background: #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px 0 0 10px;
+    flex-shrink: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .best-fit-content {
+    flex: 1;
+    min-width: 0;
+    padding: 20px 22px;
+  }
+
+  /* ── Mobile overrides ──────────────────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    body { font-size: 14px; }
+
+    .report { border-radius: 0; border-left: none; border-right: none; }
+
+    /* Header: stack vertically, centre everything */
+    .report-header { flex-direction: column; gap: 10px; padding: 16px; text-align: center; }
+    .report-header-logo { justify-content: center; max-width: 160px; margin: 0 auto; }
+    .report-header-name { text-align: center; }
+
+    /* Intro strip */
+    .intro-strip { padding: 12px 16px; }
+
+    /* Section padding */
+    .section { padding: 20px 16px; }
+    .section-dark { padding: 20px 16px; }
+
+    /* Brief + Position: stack vertically */
+    .brief-position-row { flex-direction: column; gap: 16px; padding: 16px; }
+    .brief-col-left { flex: none; width: 100%; }
+    .brief-col-right { width: 100%; }
+
+    /* KPI cards: stack vertically */
+    .kpi-row { flex-direction: column; gap: 12px; padding: 0 16px 16px; }
+    .kpi-card { width: 100%; }
+
+    /* Snapshot + Affordability: tighten padding */
+    .snapshot-block { padding: 0 16px 20px; }
+    .affordability-block { padding: 0 16px 20px; }
+
+    /* Best-fit card: stack image above content */
+    .best-fit-block { padding: 0 16px 20px; }
+    .best-fit-inner { flex-direction: column; }
+    .best-fit-image,
+    .best-fit-placeholder {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 16 / 9;
+      min-width: unset;
+      border-radius: 14px 14px 0 0;
+    }
+    /* Ensure placeholder content stays centred after aspect-ratio change */
+    .best-fit-placeholder { display: flex; align-items: center; justify-content: center; }
+
+    /* Strategy sections: stack columns */
+    .strategy-inner { flex-direction: column; }
+    .strategy-col-main,
+    .strategy-col-metrics { width: 100%; }
+
+    /* Pathways: stack cards */
+    .pathways-flex { flex-direction: column; }
+    .pathway-card { width: 100%; }
+
+    /* Sales table: horizontal scroll with minimum readable width */
+    .table-wrap {
+      overflow-x: auto;
+      overflow-y: visible;
+      -webkit-overflow-scrolling: touch;
+    }
+    .table-wrap table { min-width: 720px; }
   }
 `;
 
@@ -391,15 +618,15 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     ).join('');
 
     const propImageHtml = bestFitProperty.imageUrl
-      ? `<img src="${esc(bestFitProperty.imageUrl)}" alt="" style="width:273px;height:182px;object-fit:cover;object-position:center;display:block;border-radius:10px 0 0 10px;flex-shrink:0;" />`
-      : `<div style="width:273px;height:182px;min-width:273px;background:#e5e7eb;display:flex;align-items:center;justify-content:center;border-radius:10px 0 0 10px;flex-shrink:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;"><span style="font-size:12px;color:#9ca3af;">No image</span></div>`;
+      ? `<img src="${esc(bestFitProperty.imageUrl)}" alt="" class="best-fit-image" />`
+      : `<div class="best-fit-placeholder" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;"><span style="font-size:12px;color:#9ca3af;">No image</span></div>`;
 
     bestFitHtml = `
-      <div class="best-fit-block" style="padding:0 36px 28px;">
+      <div class="best-fit-block">
         <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:12px;">Best-Fit Affordable Example</div>
-        <div style="display:flex;align-items:stretch;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+        <div class="best-fit-inner" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;">
           ${propImageHtml}
-          <div style="flex:1;min-width:0;padding:20px 22px;">
+          <div class="best-fit-content">
             <div style="font-size:17px;font-weight:700;color:#0b2545;margin-bottom:6px;">${addressLine || v(bestFitProperty.address)}</div>
             <div style="font-size:24px;font-weight:800;color:#16a34a;margin-bottom:12px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${fmtMoney(bestFitProperty.salePrice)}</div>
             ${pillsHtml ? `<div style="display:flex;flex-wrap:wrap;gap:8px;">${pillsHtml}</div>` : ''}
@@ -416,23 +643,23 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     // First strategy always starts on page 2 in the PDF (class has no effect in browser scroll view)
     const pageBreakClass = i === 0 ? ' pdf-page-2-start' : '';
     return `
-    <section class="section section-dark${pageBreakClass}" style="background:#2c3e50;color:#ffffff;padding:34px 44px;border-top:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+    <section class="section section-dark${pageBreakClass}">
       <span class="eyebrow" style="display:inline-block;margin-bottom:16px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.72);">${label}</span>
-      <div style="display:flex;gap:24px;margin-top:0;align-items:flex-start;">
-        <div class="strategy-callout" style="flex:1.1;min-width:0;align-self:flex-start;height:auto;overflow:visible;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:24px;padding:24px;">
+      <div class="strategy-inner">
+        <div class="strategy-callout strategy-col-main">
           <h3 style="font-size:26px;line-height:1.05;letter-spacing:-0.03em;color:#ffffff;margin-bottom:12px;margin-top:0;font-weight:700;">${v(s.headline)}</h3>
           <p style="color:rgba(255,255,255,0.86);font-size:15px;line-height:1.55;margin:0;">${v(s.summary)}</p>
         </div>
-        <div style="flex:0.9;min-width:0;display:flex;flex-direction:column;gap:12px;">
-          <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
+        <div class="strategy-col-metrics">
+          <div class="metric" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;">
             <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Target Purchase</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.targetPurchasePrice)}</div>
           </div>
-          <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
+          <div class="metric" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;">
             <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Capital / Works</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.budgetAmount)}</div>
           </div>
-          <div class="metric" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);border-radius:22px;padding:20px;">
+          <div class="metric" style="-webkit-print-color-adjust:exact;print-color-adjust:exact;">
             <div style="font-size:14px;letter-spacing:0.15em;text-transform:uppercase;color:rgba(255,255,255,0.7);font-weight:700;margin-bottom:10px;margin-top:0;">Projected End Value</div>
             <div style="font-size:34px;font-weight:800;letter-spacing:-0.04em;color:#ffffff;line-height:1.02;margin-bottom:8px;margin-top:0;">${fmtMoney(s.projectedEndValue)}</div>
           </div>
@@ -458,12 +685,12 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
   // ── Strategic Pathways ────────────────────────────────────────────────────
   const pathwaysHtml = hasPathways ? `
-    <section class="section section-soft" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#f4f6f8;">
+    <section class="section section-soft">
       <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Strategic Pathways</span>
       <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#1f2933;font-weight:700;">The available ways forward</h2>
-      <div style="display:flex;gap:18px;margin-top:24px;">
+      <div class="pathways-flex">
         ${pathways.slice(0, 3).map(pw => `
-          <div class="card" style="flex:1;min-width:0;background:#ffffff;border:1px solid #d9e0e7;border-radius:24px;padding:28px;">
+          <div class="card pathway-card">
             <h3 style="font-size:22px;letter-spacing:-0.03em;color:#2c3e50;margin-bottom:12px;margin-top:0;font-weight:700;">${v(pw.title)}</h3>
             <ul style="padding-left:18px;color:#6b7280;margin:0;">
               ${(pw.points || []).map(pt => `<li style="margin-bottom:8px;">${v(pt)}</li>`).join('')}
@@ -474,7 +701,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
   // ── Final Statement ───────────────────────────────────────────────────────
   const finalHtml = hasFinalStatement ? `
-    <section class="section" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#ffffff;">
+    <section class="section">
       <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Final Position</span>
       <div class="final-box" style="background:#f8fafb;border:1px solid #d9e0e7;border-radius:24px;padding:28px;margin-top:14px;">
         <p style="font-size:32px;line-height:1.08;letter-spacing:-0.03em;color:#2c3e50;font-weight:800;margin:0;">${v(finalStatement)}</p>
@@ -497,26 +724,26 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
   <div class="report" style="max-width:1100px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:visible;border:1px solid #e5ebf0;">
 
     <!-- Block 1: Compact dark header -->
-    <div style="background:#0b2545;padding:22px 36px;display:flex;align-items:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
-      <div style="flex:1;display:flex;align-items:center;">
+    <div class="report-header">
+      <div class="report-header-logo">
         ${logoHtml}
       </div>
-      <div style="flex:1;text-align:center;">
+      <div class="report-header-title">
         <span style="font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:rgba(255,255,255,0.75);">Price Discovery Report</span>
       </div>
-      <div style="flex:1;text-align:right;">
+      <div class="report-header-name">
         <div style="font-size:18px;font-weight:700;color:#ffffff;">${v(clientName)}</div>
       </div>
     </div>
 
     <!-- Block 2: Intro strip -->
-    <div style="background:#f3f5f7;padding:14px 36px;border-bottom:1px solid #dde2e8;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+    <div class="intro-strip">
       <p style="font-size:14px;color:#374151;margin:0;">${introSentence}</p>
     </div>
 
     <!-- Block 3: 2-column Submitted Brief + Position Summary -->
-    <div class="brief-position-row" style="padding:28px 36px;display:flex;gap:24px;align-items:flex-start;">
-      <div style="flex:0 0 340px;min-width:0;background:#f8fafc;border:1px solid #dde2e8;border-radius:14px;padding:20px 22px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">
+    <div class="brief-position-row">
+      <div class="brief-col-left">
         <div style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:14px;">Submitted Brief</div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Client Budget</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(budgetDisplay)}</span></div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Location</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(locations)}</span></div>
@@ -526,7 +753,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Purpose</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(purpose)}</span></div>
         <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
       </div>
-      <div style="flex:1;min-width:0;height:auto;overflow:visible;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:20px 24px;">
+      <div class="brief-col-right">
         <div style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
         <div style="font-size:14px;font-weight:700;color:#0b2545;line-height:1.6;margin-bottom:10px;">${v(heroStatement)}</div>
         <div style="font-size:14px;color:#6b7280;line-height:1.6;">${v(viabilitySummary)}</div>
@@ -534,18 +761,18 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     </div>
 
     <!-- Block 4: 3 KPI cards -->
-    <div class="kpi-row" style="padding:0 36px 24px;display:flex;gap:16px;">
-      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+    <div class="kpi-row">
+      <div class="kpi-card">
         <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Median Sale Price</div>
         <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${medianPrice != null ? fmtMoney(medianPrice) : '—'}</div>
         <div style="font-size:12px;color:#9ca3af;">${esc(medianAlignmentLabel || 'Market midpoint')}</div>
       </div>
-      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+      <div class="kpi-card">
         <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Budget vs Median</div>
         <div style="font-size:28px;font-weight:800;color:${medianColour};line-height:1.1;margin-bottom:6px;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${budgetVsMedian != null ? fmtMoney(Math.abs(budgetVsMedian)) : '—'}</div>
         <div style="font-size:12px;color:#9ca3af;">${budgetVsMedianPct != null ? Math.abs(budgetVsMedianPct) + '% ' + budgetVsDirection + ' median' : '—'}</div>
       </div>
-      <div style="flex:1;background:#ffffff;border:1px solid #dde2e8;border-radius:14px;padding:18px 20px;">
+      <div class="kpi-card">
         <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordable Sales</div>
         <div style="font-size:28px;font-weight:800;color:#0b2545;line-height:1.1;margin-bottom:6px;">${affordableCount}</div>
         <div style="font-size:12px;color:#9ca3af;">${affordablePct != null ? affordablePct + '% of comparable sales' : 'within budget'}</div>
@@ -553,14 +780,14 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     </div>
 
     <!-- Block 5: Price Position Snapshot -->
-    <div class="snapshot-block" style="padding:0 36px 28px;">
+    <div class="snapshot-block">
       <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:14px;">Price Position Snapshot</div>
       ${rangeBarHtml}
       ${sparkHtml}
     </div>
 
     <!-- Block 6: Affordability Snapshot -->
-    <div class="affordability-block" style="padding:0 36px 28px;">
+    <div class="affordability-block">
       <div style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:#6b7280;margin-bottom:10px;">Affordability Snapshot</div>
       ${affordBarHtml}
     </div>
@@ -576,11 +803,11 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     ${strategiesHtml}
     ${pathwaysHtml}
 
-    <section class="section" style="padding:34px 44px;border-top:1px solid #edf1f4;background:#ffffff;">
+    <section class="section">
       <span class="eyebrow" style="display:inline-block;margin-bottom:12px;font-size:12px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#2c3e50;">Underlying Sales Data</span>
       <h2 class="section-title" style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;margin-bottom:8px;margin-top:0;color:#1f2933;font-weight:700;">Supporting market evidence</h2>
       <p class="intro" style="max-width:760px;font-size:16px;color:#6b7280;margin-bottom:0;margin-top:0;">The following rows reflect the underlying sales data used to support this report.</p>
-      <div class="table-wrap" style="margin-top:24px;border:1px solid #d9e0e7;border-radius:20px;overflow:hidden;background:#ffffff;">
+      <div class="table-wrap">
         <table class="sales-table" style="width:100%;border-collapse:collapse;">
           <thead>
             <tr>
