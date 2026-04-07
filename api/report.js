@@ -69,7 +69,7 @@ export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Content-Disposition', 'inline');
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
 
   return res.status(200).send(html);
 }
