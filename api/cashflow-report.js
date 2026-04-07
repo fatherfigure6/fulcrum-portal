@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   try {
     const result = await supabase
       .from('cashflow_reports')
-      .select('report_data, schema_version, status, is_public, revoked_at')
+      .select('report_data, schema_version, status, revoked_at')
       .eq('id', id)
       .single();
 
@@ -37,11 +37,10 @@ export default async function handler(req, res) {
     return res.status(404).json({ available: false });
   }
 
-  // All four conditions must be met before returning report data
+  // Report must be complete, have data, and not be revoked
   if (
     data.status !== 'complete' ||
     data.report_data === null ||
-    data.is_public !== true ||
     data.revoked_at !== null
   ) {
     return res.status(404).json({ available: false });
