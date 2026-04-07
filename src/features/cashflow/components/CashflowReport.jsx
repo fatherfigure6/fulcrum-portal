@@ -310,6 +310,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
   const mortgage   = hasPI ? loans.pi?.monthly_repayment  : loans.io?.monthly_repayment;
   const rentIncome = hasPI ? d1.pi_monthly_rental_income  : (data.annual_schedule?.[0]?.monthly_rent_net);
   const ongoingCosts = d1.pi_monthly_ongoing_costs ?? data.annual_schedule?.[0]?.monthly_ongoing_costs;
+  const pmCosts      = data.annual_schedule?.[0]?.property_mgmt_monthly ?? 0;
   const taxBenefit = hasPI ? d1.pi_monthly_tax_benefit    : d1.io_monthly_tax_benefit;
 
   const ENTITY_LABEL = {
@@ -362,7 +363,8 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
           {[
             { label: 'Rental income (vacancy-adjusted)', value: rentIncome, sign: '+', colour: '#059669' },
             { label: 'Mortgage repayment', value: mortgage, sign: '-', colour: '#dc2626' },
-            { label: 'Ongoing costs', value: ongoingCosts, sign: '-', colour: '#dc2626' },
+            { label: 'Ongoing costs (council, insurance, etc.)', value: ongoingCosts, sign: '-', colour: '#dc2626' },
+            { label: 'Property management (7.7% of rent)', value: pmCosts, sign: '-', colour: '#dc2626' },
           ].map(({ label, value, sign, colour }) => (
             <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
               <span style={{ fontSize: 13, color: '#6b7280' }}>{label}</span>
@@ -372,7 +374,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid #e5e7eb' }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>Out of pocket subtotal</span>
             <span style={{ fontSize: 13, fontWeight: 700, color: '#dc2626' }}>
-              {fmtSigned((rentIncome ?? 0) - (mortgage ?? 0) - (ongoingCosts ?? 0))}/mo
+              {fmtSigned((rentIncome ?? 0) - (mortgage ?? 0) - (ongoingCosts ?? 0) - (pmCosts ?? 0))}/mo
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '7px 0', borderBottom: '1px solid #f3f4f6' }}>
@@ -569,7 +571,7 @@ function CashflowPanel({ data, hasPI }) {
           <table style={tableStyle}>
             <thead>
               <tr>
-                {['Year', 'Weekly Rent', 'Mortgage', 'Outgoings', 'Before Tax', 'Tax Benefit', 'After Tax', 'Cumulative'].map((h, i) => (
+                {['Year', 'Weekly Rent', 'Mortgage', 'Outgoings incl. PM', 'Before Tax', 'Tax Benefit', 'After Tax', 'Cumulative'].map((h, i) => (
                   <th key={h} style={i === 0 ? thLeftStyle : thStyle}>{h}</th>
                 ))}
               </tr>
@@ -587,7 +589,7 @@ function CashflowPanel({ data, hasPI }) {
                     <td style={{ ...tdStyle(hl), textAlign: 'left', fontWeight: hl ? 700 : 400 }}>{row.year}</td>
                     <td style={tdStyle(hl)}>${fmt(row.weekly_rent)}</td>
                     <td style={tdStyle(hl)}>${fmt(mtg)}</td>
-                    <td style={tdStyle(hl)}>${fmt(row.monthly_ongoing_costs)}</td>
+                    <td style={tdStyle(hl)}>${fmt((row.monthly_ongoing_costs || 0) + (row.property_mgmt_monthly || 0))}</td>
                     <td style={{ ...tdStyle(hl), ...netStyle(nbf) }}>{fmtSigned(nbf)}/mo</td>
                     <td style={{ ...tdStyle(hl), color: '#059669' }}>+${fmt(tb)}/mo</td>
                     <td style={{ ...tdStyle(hl), ...netStyle(net), fontWeight: 700 }}>{fmtSigned(net)}/mo</td>

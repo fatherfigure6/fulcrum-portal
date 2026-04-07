@@ -16,8 +16,6 @@
 import {
   INFLATION_RATE,
   PROPERTY_MGMT_RATE,
-  PROPERTY_MGMT_LETTING_FEE_WEEKS,
-  PROPERTY_MGMT_LETTING_YEARS,
   DIVISION_43_RATE,
   DIVISION_43_LIFE_YEARS,
   DIVISION_40_RATE,
@@ -240,12 +238,10 @@ export function calculate(inputs: InputsFinal, generatedAt: string): Record<stri
   const annualRentYear1Net    = annualRentYear1Gross * (1 - vacancyRate);
   const monthlyRentYear1Net   = annualRentYear1Net / 12;
 
-  // Property management year 1
+  // Property management year 1 — 7.7% of gross annual rent only.
+  // Letting fee not modelled separately: covered by the 4-week vacancy assumption.
   const pmAnnualYear1  = annualRentYear1Gross * PROPERTY_MGMT_RATE;
-  const pmLettingYear1 = PROPERTY_MGMT_LETTING_YEARS.includes(1)
-    ? inputs.weekly_rent * PROPERTY_MGMT_LETTING_FEE_WEEKS
-    : 0;
-  const pmMonthlyYear1 = (pmAnnualYear1 + pmLettingYear1) / 12;
+  const pmMonthlyYear1 = pmAnnualYear1 / 12;
 
   const grossYieldPct = r2(annualRentYear1Gross / inputs.purchase_price * 100);
   const netYieldPct   = r2(
@@ -370,12 +366,10 @@ export function calculate(inputs: InputsFinal, generatedAt: string): Record<stri
     const totalOngoingY    = Object.values(ongoingY).reduce((a, b) => a + b, 0);
     const monthlyOngoingY  = totalOngoingY / 12;
 
-    // Property management (inflated via rent growth, not inflation)
+    // Property management — 7.7% of gross annual rent, grows with rent.
+    // Letting fee not modelled separately: covered by the 4-week vacancy assumption.
     const pmAnnualY  = weeklyRentY * 52 * PROPERTY_MGMT_RATE;
-    const pmLettingY = PROPERTY_MGMT_LETTING_YEARS.includes(year)
-      ? weeklyRentY * PROPERTY_MGMT_LETTING_FEE_WEEKS
-      : 0;
-    const pmMonthlyY = (pmAnnualY + pmLettingY) / 12;
+    const pmMonthlyY = pmAnnualY / 12;
 
     // Depreciation for this year
     const depY = annualDepreciation(inputs, year);
