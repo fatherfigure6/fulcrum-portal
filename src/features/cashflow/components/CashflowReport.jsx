@@ -469,7 +469,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
       {/* Capital position milestone cards */}
       <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Capital position milestones</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
-        {[5, 10, 20].map(yr => {
+        {[5, 10, 15, 20].map(yr => {
           const m = data.milestones[`year_${yr}`];
           if (!m) return null;
           const eq    = m.equity_pi ?? m.equity_io;
@@ -645,7 +645,7 @@ function ProjectionsPanel({ data, hasPI }) {
 
       {/* Milestone cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        {[5, 10, 20].map(yr => {
+        {[5, 10, 15, 20].map(yr => {
           const m   = data.milestones[`year_${yr}`];
           if (!m) return null;
           const eq    = m.equity_pi ?? m.equity_io;

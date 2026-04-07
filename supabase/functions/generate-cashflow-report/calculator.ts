@@ -596,6 +596,7 @@ export function calculate(inputs: InputsFinal, generatedAt: string): Record<stri
     milestones: {
       year_5:  milestone(5),
       year_10: milestone(10),
+      year_15: milestone(15),
       year_20: milestone(20),
     },
     crossover_year_pi: crossoverYearPI,
