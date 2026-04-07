@@ -1149,7 +1149,6 @@ function AppShell({ session, onLogout, requests, users }) {
     { path:"/pdr-reports",   icon:"🔍", label:"PD Reports",    badge:pendingPDR },
     { section:"Cashflow Analysis" },
     { path:"/cashflow",          icon:"📈", label:"Cashflow Reports" },
-    { path:"/cashflow/staff/new", icon:"➕", label:"New Cashflow Report" },
     { section:"Referrals" },
     { path:"/referrals",     icon:"🤝", label:"Referrals",     badge:pendingReferrals },
     { section:"Admin" },
