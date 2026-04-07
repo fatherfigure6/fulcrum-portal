@@ -19,6 +19,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+// ── Responsive hook ────────────────────────────────────────────────────────────
+
+function useIsMobile(bp = 640) {
+  const [mob, setMob] = useState(() => typeof window !== 'undefined' && window.innerWidth < bp);
+  useEffect(() => {
+    const fn = () => setMob(window.innerWidth < bp);
+    window.addEventListener('resize', fn);
+    return () => window.removeEventListener('resize', fn);
+  }, [bp]);
+  return mob;
+}
+
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
 function fmt(n) {
@@ -287,6 +299,7 @@ function BrandedGate({ heading, body }) {
 // ── Overview panel ─────────────────────────────────────────────────────────────
 
 function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
+  const isMobile = useIsMobile();
   const d1      = data.day_one;
   const pc      = data.purchasing_costs;
   const entity  = data.entity;
@@ -343,7 +356,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
       </div>
 
       {/* Monthly cashflow breakdown */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 24 }}>
         <div style={cardStyle}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 16 }}>Monthly cashflow breakdown — Year 1</div>
           {[
@@ -453,7 +466,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
 
       {/* Capital position milestone cards */}
       <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Capital position milestones</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16 }}>
         {[5, 10, 20].map(yr => {
           const m = data.milestones[`year_${yr}`];
           if (!m) return null;
@@ -490,6 +503,7 @@ function OverviewPanel({ data, hasPI, hasIO, isSMSF }) {
 // ── Cashflow panel ─────────────────────────────────────────────────────────────
 
 function CashflowPanel({ data, hasPI }) {
+  const isMobile = useIsMobile();
   const schedule = data.annual_schedule || [];
   const SNAP_YEARS = [1, 2, 5, 10];
 
@@ -504,7 +518,7 @@ function CashflowPanel({ data, hasPI }) {
       <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 20 }}>Cashflow</div>
 
       {/* Snapshot cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {SNAP_YEARS.map(yr => {
           const row = schedule.find(r => r.year === yr);
           if (!row) return null;
@@ -628,7 +642,7 @@ function ProjectionsPanel({ data, hasPI }) {
       </div>
 
       {/* Milestone cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[5, 10, 20].map(yr => {
           const m   = data.milestones[`year_${yr}`];
           if (!m) return null;
@@ -743,6 +757,7 @@ function ProjectionsPanel({ data, hasPI }) {
 // ── Loan comparison panel ──────────────────────────────────────────────────────
 
 function LoanComparisonPanel({ data }) {
+  const isMobile = useIsMobile();
   const schedule = data.annual_schedule || [];
   const loans    = data.loans;
   const SNAP_YEARS = [1, 2, 5, 10];
@@ -835,7 +850,7 @@ function LoanComparisonPanel({ data }) {
       {/* Total interest comparison */}
       <div style={cardStyle}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#111827', marginBottom: 12 }}>Total interest paid over loan term</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           <div>
             <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>P&amp;I — total interest</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#dc2626' }}>${fmt(y20.total_interest_paid_pi)}</div>
@@ -868,6 +883,7 @@ const ENTITY_LABEL = {
 };
 
 function CashflowReport({ data }) {
+  const isMobile = useIsMobile();
   const hasPI  = !!data.loans?.pi;
   const hasIO  = !!data.loans?.io;
   const hasBoth = hasPI && hasIO;
@@ -913,15 +929,21 @@ function CashflowReport({ data }) {
   return (
     <div style={{ fontFamily: 'Inter, Arial, sans-serif', minHeight: '100vh', background: '#f5f7fa', color: '#111827' }}>
       {/* Report header */}
-      <div style={{ background: 'var(--primary, #1a2e5a)', padding: '18px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <img src="/No BG, Light Text.png" alt="Fulcrum Australia" style={{ height: 36 }} />
-          <div>
-            <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Cashflow Analysis Report</div>
-          </div>
+      <div style={{
+        background: 'var(--primary, #1a2e5a)',
+        padding: isMobile ? '16px' : '18px 32px',
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'flex-start' : 'center',
+        justifyContent: 'space-between',
+        gap: 12,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src="/No BG, Light Text.png" alt="Fulcrum Australia" style={{ height: 30 }} />
+          <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', fontWeight: 600 }}>Cashflow Analysis Report</div>
         </div>
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ color: '#fff', fontSize: 14, fontWeight: 600, marginBottom: 3 }}>{data.property?.address}</div>
+        <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+          <div style={{ color: '#fff', fontSize: isMobile ? 13 : 14, fontWeight: 600, marginBottom: 3 }}>{data.property?.address}</div>
           <span style={{ background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.9)', fontSize: 11, fontWeight: 600, padding: '2px 10px', borderRadius: 12 }}>
             {ENTITY_LABEL[data.entity?.type] || data.entity?.type}
           </span>
@@ -929,20 +951,21 @@ function CashflowReport({ data }) {
       </div>
 
       {/* Sticky tab bar */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 32px', display: 'flex', gap: 0 }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 100, background: '#fff', borderBottom: '1px solid #e5e7eb', padding: isMobile ? '0 8px' : '0 32px', display: 'flex', gap: 0, overflowX: 'auto' }}>
         {TABS.map(tab => (
           <a
             key={tab.id}
             href={`#${tab.id}`}
             style={{
               display: 'inline-block',
-              padding: '13px 20px',
-              fontSize: 13,
+              padding: isMobile ? '11px 12px' : '13px 20px',
+              fontSize: isMobile ? 12 : 13,
               fontWeight: activeTab === tab.id ? 700 : 400,
               color: activeTab === tab.id ? 'var(--primary, #1a2e5a)' : '#6b7280',
               borderBottom: activeTab === tab.id ? '2px solid var(--primary, #1a2e5a)' : '2px solid transparent',
               textDecoration: 'none',
               transition: 'color 0.15s',
+              whiteSpace: 'nowrap',
             }}
           >
             {tab.label}
@@ -951,7 +974,7 @@ function CashflowReport({ data }) {
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 1040, margin: '0 auto', padding: '0 32px 60px' }}>
+      <div style={{ maxWidth: 1040, margin: '0 auto', padding: isMobile ? '0 16px 60px' : '0 32px 60px' }}>
         <div ref={sectionRefs.overview}>
           <OverviewPanel data={data} hasPI={hasPI} hasIO={hasIO} isSMSF={isSMSF} />
         </div>
@@ -969,7 +992,7 @@ function CashflowReport({ data }) {
       </div>
 
       {/* Footer */}
-      <div style={{ borderTop: '1px solid #e5e7eb', background: '#f9fafb', padding: '24px 32px', textAlign: 'center' }}>
+      <div style={{ borderTop: '1px solid #e5e7eb', background: '#f9fafb', padding: isMobile ? '24px 16px' : '24px 32px', textAlign: 'center' }}>
         <div style={{ fontSize: 12, color: '#6b7280', maxWidth: 720, margin: '0 auto', lineHeight: 1.7 }}>
           {DISCLAIMER}
         </div>
