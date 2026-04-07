@@ -36,6 +36,7 @@ import {
 // ── Section metadata ──────────────────────────────────────────────────────────
 
 export const STAFF_SECTIONS = [
+  { id: 'P', label: 'Property details' },
   { id: 'A', label: 'Rental income & assumptions' },
   { id: 'B', label: 'Stamp duty & transfer costs' },
   { id: 'C', label: 'Ongoing property costs' },
@@ -48,6 +49,23 @@ export const STAFF_SECTIONS = [
 // ── Field definitions ─────────────────────────────────────────────────────────
 
 const staffFormConfig = [
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Section P — Property details
+  // ══════════════════════════════════════════════════════════════════════════
+
+  {
+    id:           'property_address',
+    section:      'P',
+    sectionLabel: 'Property details',
+    type:         'places_autocomplete',
+    label:        'Property address',
+    hint:         'Start typing to search. Pre-filled from broker submission if available.',
+    required:     true,
+    defaultValue: null,
+    validation:   (v) => (v && v.formatted_address) ? null : 'Please select a property address',
+    visibleWhen:  () => true,
+  },
 
   // ══════════════════════════════════════════════════════════════════════════
   // Section A — Rental income & assumptions
