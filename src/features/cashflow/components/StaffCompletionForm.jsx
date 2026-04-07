@@ -642,7 +642,7 @@ function BrokerContextPanel({ inputsBroker }) {
 // ── Success screen ─────────────────────────────────────────────────────────────
 
 function SuccessScreen({ generatedId, onViewDashboard }) {
-  const publicUrl = `${window.location.origin}/report?id=${generatedId}`;
+  const publicUrl = `${window.location.origin}/share/report/${generatedId}`;
 
   return (
     <div style={s.success}>
@@ -653,7 +653,7 @@ function SuccessScreen({ generatedId, onViewDashboard }) {
         The broker will be notified when you trigger the notification below.
       </p>
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-        <a href={`/report?id=${generatedId}`} target="_blank" rel="noreferrer" style={s.successLink}>
+        <a href={`/share/report/${generatedId}`} target="_blank" rel="noreferrer" style={s.successLink}>
           View report
         </a>
         <button type="button" style={s.successSecondary} onClick={onViewDashboard}>

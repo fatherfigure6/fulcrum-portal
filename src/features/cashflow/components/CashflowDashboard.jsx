@@ -161,7 +161,7 @@ function BrokerDashboard({ supabase }) {
                   <td style={{ ...tdStyle, textAlign: 'right' }}>
                     {row.status === 'complete' && (
                       <a
-                        href={`/report?id=${row.id}`}
+                        href={`/share/report/${row.id}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: 13, fontWeight: 600, color: 'var(--teal)', textDecoration: 'none' }}
@@ -350,7 +350,7 @@ function StaffDashboard({ supabase }) {
                     )}
                     {row.status === 'complete' && (
                       <a
-                        href={`/report?id=${row.id}`}
+                        href={`/share/report/${row.id}`}
                         target="_blank"
                         rel="noreferrer"
                         style={{ fontSize: 13, fontWeight: 600, color: 'var(--teal)', textDecoration: 'none' }}
