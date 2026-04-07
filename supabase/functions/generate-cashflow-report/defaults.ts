@@ -7,8 +7,9 @@
 
 export const ASSUMPTIONS_VERSION = '1.0';
 
-// Annual inflation rate — system constant, not editable via any form field
-export const INFLATION_RATE = 0.038;  // 3.8%
+// Annual inflation rate — system constant, not editable via any form field.
+// Used for display purposes only; ongoing costs are modelled as fixed (not inflated).
+export const INFLATION_RATE = 0.03;  // 3%
 
 // Property management — Perth Rental Management standard fee structure
 export const PROPERTY_MGMT_RATE              = 0.077;  // 7.7% of gross annual rent

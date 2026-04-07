@@ -188,7 +188,7 @@ export function calculate(inputs: InputsFinal, generatedAt: string): Record<stri
   // ── Strata fees (resolved) ────────────────────────────────────────────────
   const strataFees = resolvedStrataFees(inputs);
 
-  // ── Year 1 ongoing costs (base for inflation) ──────────────────────────────
+  // ── Ongoing costs (base values — inflated at INFLATION_RATE each year) ──────
   const baseOngoingCosts = {
     council_rates: inputs.council_rates     || 0,
     water_rates:   inputs.water_rates       || 0,
@@ -348,7 +348,8 @@ export function calculate(inputs: InputsFinal, generatedAt: string): Record<stri
     const equityPI = hasPI && loanBalPI !== undefined ? r0(marketValue - loanBalPI) : undefined;
     const equityIO = hasIO && loanBalIO !== undefined ? r0(marketValue - loanBalIO) : undefined;
 
-    // Ongoing costs (inflation-adjusted)
+    // Ongoing costs (inflation-adjusted at INFLATION_RATE).
+    // Rental management fees grow separately with rent (percentage-based).
     const ongoingY = {
       council_rates: inflate(baseOngoingCosts.council_rates, year),
       water_rates:   inflate(baseOngoingCosts.water_rates,   year),

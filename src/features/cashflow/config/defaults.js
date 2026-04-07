@@ -7,8 +7,8 @@
 // =============================================================================
 
 // Inflation rate — system constant, not user-configurable.
-// Applied to all ongoing costs annually.
-export const INFLATION_RATE = 0.038;
+// Used for display in the assumptions bar; ongoing costs are fixed (not inflated).
+export const INFLATION_RATE = 0.03;
 
 // Property management — fixed Fulcrum house rule, not user-entered.
 export const PROPERTY_MGMT_RATE = 0.077;                          // 7.7% of gross annual rent
@@ -17,7 +17,7 @@ export const PROPERTY_MGMT_LETTING_YEARS = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19]; 
 
 // Forecast assumption defaults (pre-filled in staff form, editable by staff)
 export const DEFAULT_CAP_GROWTH    = 7.0;   // %
-export const DEFAULT_RENTAL_GROWTH = 3.5;   // %
+export const DEFAULT_RENTAL_GROWTH = 4.0;   // %
 export const DEFAULT_VACANCY_WEEKS = 4;     // weeks per year → 4/52 = 7.69...%
 export const DEFAULT_VACANCY_RATE  = DEFAULT_VACANCY_WEEKS / 52;
 
