@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
 import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
-import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, Outlet } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams, Outlet } from "react-router-dom";
 import buildPdrReportData from './utils/buildPdrReportData';
 import PdrReportPreview   from './components/PdrReportPreview';
 import parseSalesCsv      from './utils/parseSalesCsv';
 import * as XLSX           from 'xlsx';
 import renderPdrReportHtml from './utils/renderPdrReportHtml';
+import BrokerRequestForm     from './features/cashflow/components/BrokerRequestForm.jsx';
+import StaffCompletionForm  from './features/cashflow/components/StaffCompletionForm.jsx';
+import CashflowDashboard    from './features/cashflow/components/CashflowDashboard.jsx';
+import CashflowReportPage   from './features/cashflow/components/CashflowReport.jsx';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -707,6 +711,17 @@ export default function App() {
 
   const refreshRequests = () => loadRequests().then(setRequests).catch(console.error);
 
+  // Notification callback for cashflow request submission
+  const onCashflowNotify = async ({ brokerName, propertyAddress }) => {
+    const msg = `New Cashflow Analysis Request\nFrom: ${brokerName}\nProperty: ${propertyAddress}\n\nLog in to the portal to complete and generate the report.`;
+    sendEmail(EMAILJS_TEMPLATE_STAFF, {
+      email: "brian@fulcrumaustralia.com.au",
+      subject: `New Cashflow Request — ${brokerName}`,
+      message: msg,
+    });
+    sendWhatsApp(msg);
+  };
+
   const updateRequest = async (id, patch) => {
     const dbPatch = {};
     if (patch.status       !== undefined) dbPatch.status        = patch.status;
@@ -751,6 +766,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPasswordScreen onForgotPassword={forgotPassword} />} />
         <Route path="/reset-password"  element={<ResetPasswordScreen onResetPassword={resetPassword} onSignOut={() => supabase.auth.signOut()} />} />
         <Route path="/pdr"             element={<PDRPublicForm />} />
+        <Route path="/report"          element={<CashflowReportPage />} />
 
         <Route path="/change-password" element={
           <ProtectedRoute session={session} isLoading={isLoading}>
@@ -809,12 +825,82 @@ export default function App() {
               ? <NewRequest onSubmit={submitRequest} session={session} />
               : <Navigate to="/dashboard" replace />
           } />
+
+          {/* ── Cashflow Analysis ── */}
+          <Route path="cashflow/new" element={
+            session?.role === "broker"
+              ? <BrokerRequestForm supabase={supabase} session={session} onNotify={onCashflowNotify} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="cashflow/staff/new" element={
+            session?.role === "staff"
+              ? <StaffCompletionForm
+                  cashflowRequest={null}
+                  supabase={supabase}
+                  session={session}
+                  onComplete={(id) => navigate(`/report?id=${id}`)}
+                  onCancel={() => navigate('/cashflow')}
+                />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="cashflow/:id" element={
+            session?.role === "staff"
+              ? <StaffCashflowRoute supabase={supabase} session={session} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="cashflow" element={
+            <CashflowDashboard supabase={supabase} session={session} />
+          } />
+
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </>
+  );
+}
+
+// ── Staff cashflow route — loads request and renders StaffCompletionForm ──────
+function StaffCashflowRoute({ supabase, session }) {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [request, setRequest] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    supabase
+      .from('cashflow_reports')
+      .select('id, inputs_broker, inputs_final, status, property_address, entity_type')
+      .eq('id', id)
+      .single()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error || !data) {
+          setLoadError('Request not found or you do not have access.');
+        } else {
+          setRequest(data);
+        }
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [id, supabase]);
+
+  if (loading) return <div style={{padding:40,textAlign:'center',color:'#888'}}>Loading request…</div>;
+  if (loadError) return <div style={{padding:40,textAlign:'center',color:'#ef4444'}}>{loadError}</div>;
+
+  return (
+    <StaffCompletionForm
+      cashflowRequest={request}
+      supabase={supabase}
+      session={session}
+      onComplete={() => navigate('/cashflow')}
+      onCancel={() => navigate('/cashflow')}
+    />
   );
 }
 
@@ -1061,6 +1147,9 @@ function AppShell({ session, onLogout, requests, users }) {
     { path:"/price-check-requests",  icon:"🏡", label:"Price Check Requests",  badge:pendingCMA  },
     { section:"Price Discovery" },
     { path:"/pdr-reports",   icon:"🔍", label:"PD Reports",    badge:pendingPDR },
+    { section:"Cashflow Analysis" },
+    { path:"/cashflow",          icon:"📈", label:"Cashflow Reports" },
+    { path:"/cashflow/staff/new", icon:"➕", label:"New Cashflow Report" },
     { section:"Referrals" },
     { path:"/referrals",     icon:"🤝", label:"Referrals",     badge:pendingReferrals },
     { section:"Admin" },
@@ -1068,9 +1157,12 @@ function AppShell({ session, onLogout, requests, users }) {
     { path:"/staff",         icon:"🔐", label:"Staff Accounts" },
   ];
   const brokerNav = [
-    { path:"/dashboard",    icon:"🏠", label:"Dashboard" },
-    { path:"/requests/new", icon:"✏️",  label:"New Request" },
-    { path:"/requests",     icon:"📋", label:"My Requests" },
+    { path:"/dashboard",             icon:"🏠", label:"Dashboard" },
+    { path:"/requests/new",          icon:"✏️",  label:"New Request" },
+    { path:"/requests",              icon:"📋", label:"My Requests" },
+    { section:"Cashflow Analysis" },
+    { path:"/cashflow/new",          icon:"📈", label:"New Cashflow Request" },
+    { path:"/cashflow",              icon:"📊", label:"My Cashflow Reports" },
   ];
   const nav = isStaff ? adminNav : brokerNav;
   const navItems = nav.filter(n => !n.section);
