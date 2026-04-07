@@ -314,7 +314,14 @@ function Breadcrumbs() {
 }
 
 function LoadingScreen() {
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#999"}}>Loading…</div>;
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f7fa', display: 'grid', placeItems: 'center', fontFamily: 'Inter, Arial, sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <img src="/No BG, Light Text.png" alt="Fulcrum Australia" style={{ height: 36, marginBottom: 24, filter: 'invert(1) brightness(0.3)' }} />
+        <div style={{ fontSize: 14, color: '#9ca3af' }}>Loading…</div>
+      </div>
+    </div>
+  );
 }
 
 function ProtectedRoute({ session, isLoading, children }) {
