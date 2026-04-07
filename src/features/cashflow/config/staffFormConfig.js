@@ -38,14 +38,14 @@ import {
 // ── Section metadata ──────────────────────────────────────────────────────────
 
 export const STAFF_SECTIONS = [
-  { id: 'F', label: 'Lending details' },
-  { id: 'P', label: 'Property details' },
-  { id: 'A', label: 'Rental income & assumptions' },
-  { id: 'B', label: 'Stamp duty & transfer costs' },
-  { id: 'C', label: 'Ongoing property costs' },
-  { id: 'D', label: 'Depreciation' },
-  { id: 'E', label: 'Acquisition costs' },
-  { id: 'G', label: 'Entity & buyers' },
+  { id: 'A', label: 'Lending details' },
+  { id: 'B', label: 'Property details' },
+  { id: 'C', label: 'Rental income & assumptions' },
+  { id: 'D', label: 'Stamp duty & transfer costs' },
+  { id: 'E', label: 'Ongoing property costs' },
+  { id: 'F', label: 'Depreciation' },
+  { id: 'G', label: 'Acquisition costs' },
+  { id: 'H', label: 'Entity & buyers' },
 ];
 
 // ── Field definitions ─────────────────────────────────────────────────────────
@@ -53,12 +53,12 @@ export const STAFF_SECTIONS = [
 const staffFormConfig = [
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section F — Lending details (pre-filled from inputs_broker, editable)
+  // Section A — Lending details (pre-filled from inputs_broker, editable)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'purchase_price',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Purchase price',
@@ -71,7 +71,7 @@ const staffFormConfig = [
 
   {
     id:           'deposit',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Deposit',
@@ -84,7 +84,7 @@ const staffFormConfig = [
 
   {
     id:           'loan_type',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'select',
     label:        'Loan type',
@@ -102,7 +102,7 @@ const staffFormConfig = [
 
   {
     id:           'pi_interest_rate',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'percentage',
     label:        'P&I interest rate',
@@ -115,7 +115,7 @@ const staffFormConfig = [
 
   {
     id:           'pi_loan_term',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'integer',
     label:        'P&I loan term (years)',
@@ -128,7 +128,7 @@ const staffFormConfig = [
 
   {
     id:           'pi_annual_fee',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Annual bank fee — P&I loan',
@@ -141,7 +141,7 @@ const staffFormConfig = [
 
   {
     id:           'io_interest_rate',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'percentage',
     label:        'IO interest rate',
@@ -154,7 +154,7 @@ const staffFormConfig = [
 
   {
     id:           'io_loan_term',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'integer',
     label:        'IO loan term (years)',
@@ -167,7 +167,7 @@ const staffFormConfig = [
 
   {
     id:           'io_annual_fee',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Annual bank fee — IO loan',
@@ -180,7 +180,7 @@ const staffFormConfig = [
 
   {
     id:           'establishment_fee',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Mortgage establishment fee',
@@ -193,7 +193,7 @@ const staffFormConfig = [
 
   {
     id:           'lmi',
-    section:      'F',
+    section:      'A',
     sectionLabel: 'Lending details',
     type:         'currency',
     label:        'Lenders Mortgage Insurance (LMI)',
@@ -205,12 +205,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section P — Property details
+  // Section B — Property details
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'property_address',
-    section:      'P',
+    section:      'B',
     sectionLabel: 'Property details',
     type:         'text',
     label:        'Property address',
@@ -223,7 +223,7 @@ const staffFormConfig = [
 
   {
     id:           'property_type',
-    section:      'P',
+    section:      'B',
     sectionLabel: 'Property details',
     type:         'select',
     label:        'Property type',
@@ -240,12 +240,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section A — Rental income & assumptions
+  // Section C — Rental income & assumptions
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'weekly_rent',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'currency',
     label:        'Weekly rental income',
@@ -258,7 +258,7 @@ const staffFormConfig = [
 
   {
     id:           'assumptions_cap_growth',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'percentage',
     label:        'Annual capital growth rate',
@@ -271,7 +271,7 @@ const staffFormConfig = [
 
   {
     id:           'assumptions_rental_growth',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'percentage',
     label:        'Annual rental growth rate',
@@ -284,7 +284,7 @@ const staffFormConfig = [
 
   {
     id:           'assumptions_vacancy',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'integer',
     label:        'Vacancy allowance (weeks per year)',
@@ -300,7 +300,7 @@ const staffFormConfig = [
 
   {
     id:           'info_inflation_rate',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'info',
     label:        'Annual inflation rate',
@@ -314,7 +314,7 @@ const staffFormConfig = [
 
   {
     id:           'info_property_mgmt',
-    section:      'A',
+    section:      'C',
     sectionLabel: 'Rental income & assumptions',
     type:         'info',
     label:        'Property management',
@@ -327,12 +327,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section B — Stamp duty & transfer costs
+  // Section D — Stamp duty & transfer costs
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'stamp_duty',
-    section:      'B',
+    section:      'D',
     sectionLabel: 'Stamp duty & transfer costs',
     type:         'currency',
     label:        'Stamp duty + transfer fee',
@@ -344,12 +344,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section C — Ongoing property costs
+  // Section E — Ongoing property costs
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'council_rates',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Council rates (annual)',
@@ -362,7 +362,7 @@ const staffFormConfig = [
 
   {
     id:           'water_rates',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Water rates (annual)',
@@ -375,7 +375,7 @@ const staffFormConfig = [
 
   {
     id:           'insurance',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Landlord insurance (annual)',
@@ -388,7 +388,7 @@ const staffFormConfig = [
 
   {
     id:           'maintenance',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Annual maintenance allowance',
@@ -401,7 +401,7 @@ const staffFormConfig = [
 
   {
     id:           'strata_fees',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Annual strata fees',
@@ -414,7 +414,7 @@ const staffFormConfig = [
 
   {
     id:           'land_tax',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Land tax (annual)',
@@ -427,7 +427,7 @@ const staffFormConfig = [
 
   {
     id:           'ongoing_other_1_label',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'text',
     label:        'Other ongoing cost 1 — label',
@@ -440,7 +440,7 @@ const staffFormConfig = [
 
   {
     id:           'ongoing_other_1_amount',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Other ongoing cost 1 — annual amount',
@@ -453,7 +453,7 @@ const staffFormConfig = [
 
   {
     id:           'ongoing_other_2_label',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'text',
     label:        'Other ongoing cost 2 — label',
@@ -466,7 +466,7 @@ const staffFormConfig = [
 
   {
     id:           'ongoing_other_2_amount',
-    section:      'C',
+    section:      'E',
     sectionLabel: 'Ongoing property costs',
     type:         'currency',
     label:        'Other ongoing cost 2 — annual amount',
@@ -478,12 +478,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section D — Depreciation
+  // Section F — Depreciation
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'build_cost',
-    section:      'D',
+    section:      'F',
     sectionLabel: 'Depreciation',
     type:         'currency',
     label:        'Estimated build cost',
@@ -496,7 +496,7 @@ const staffFormConfig = [
 
   {
     id:           'build_year',
-    section:      'D',
+    section:      'F',
     sectionLabel: 'Depreciation',
     type:         'year',
     label:        'Year the building was constructed',
@@ -513,7 +513,7 @@ const staffFormConfig = [
 
   {
     id:           'appliance_cost',
-    section:      'D',
+    section:      'F',
     sectionLabel: 'Depreciation',
     type:         'currency',
     label:        'Estimated appliance cost',
@@ -526,7 +526,7 @@ const staffFormConfig = [
 
   {
     id:           'depreciation_allowance',
-    section:      'D',
+    section:      'F',
     sectionLabel: 'Depreciation',
     type:         'currency',
     label:        'Estimated annual depreciation allowance',
@@ -538,12 +538,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section E — Acquisition costs
+  // Section G — Acquisition costs
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'buyers_agent_fee',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'currency',
     label:        "Buyer's agent fee",
@@ -556,7 +556,7 @@ const staffFormConfig = [
 
   {
     id:           'conveyancer',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'currency',
     label:        'Conveyancer / settlement agent fee',
@@ -569,7 +569,7 @@ const staffFormConfig = [
 
   {
     id:           'renovation_allowance',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'currency',
     label:        'Renovation / initial maintenance allowance',
@@ -582,7 +582,7 @@ const staffFormConfig = [
 
   {
     id:           'other_cost_1_label',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'text',
     label:        'Other acquisition cost 1 — label',
@@ -595,7 +595,7 @@ const staffFormConfig = [
 
   {
     id:           'other_cost_1_amount',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'currency',
     label:        'Other acquisition cost 1 — amount',
@@ -608,7 +608,7 @@ const staffFormConfig = [
 
   {
     id:           'other_cost_2_label',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'text',
     label:        'Other acquisition cost 2 — label',
@@ -621,7 +621,7 @@ const staffFormConfig = [
 
   {
     id:           'other_cost_2_amount',
-    section:      'E',
+    section:      'G',
     sectionLabel: 'Acquisition costs',
     type:         'currency',
     label:        'Other acquisition cost 2 — amount',
@@ -633,12 +633,12 @@ const staffFormConfig = [
   },
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Section G — Entity & buyers (pre-filled from inputs_broker, editable)
+  // Section H — Entity & buyers (pre-filled from inputs_broker, editable)
   // ══════════════════════════════════════════════════════════════════════════
 
   {
     id:           'entity_type',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'select',
     label:        'Purchasing entity',
@@ -657,7 +657,7 @@ const staffFormConfig = [
 
   {
     id:           'buyer_1_name',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'text',
     label:        'Buyer 1 — full name',
@@ -670,7 +670,7 @@ const staffFormConfig = [
 
   {
     id:           'buyer_1_income',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'currency',
     label:        'Buyer 1 — annual income before tax',
@@ -683,7 +683,7 @@ const staffFormConfig = [
 
   {
     id:           'buyer_2_name',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'text',
     label:        'Buyer 2 — full name',
@@ -696,7 +696,7 @@ const staffFormConfig = [
 
   {
     id:           'buyer_2_income',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'currency',
     label:        'Buyer 2 — annual income before tax',
@@ -709,7 +709,7 @@ const staffFormConfig = [
 
   {
     id:           'ownership_split',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'split',
     label:        'Ownership split',
@@ -730,7 +730,7 @@ const staffFormConfig = [
 
   {
     id:           'smsf_fund_name',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'text',
     label:        'SMSF fund name',
@@ -743,7 +743,7 @@ const staffFormConfig = [
 
   {
     id:           'smsf_contributions',
-    section:      'G',
+    section:      'H',
     sectionLabel: 'Entity & buyers',
     type:         'currency',
     label:        'Annual concessional contributions to the fund',
