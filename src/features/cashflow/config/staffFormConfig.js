@@ -67,6 +67,24 @@ const staffFormConfig = [
     visibleWhen:  () => true,
   },
 
+  {
+    id:           'property_type',
+    section:      'P',
+    sectionLabel: 'Property details',
+    type:         'select',
+    label:        'Property type',
+    required:     true,
+    defaultValue: null,
+    options: [
+      { value: 'house',           label: 'House' },
+      { value: 'unit_duplex',     label: 'Unit / Duplex' },
+      { value: 'villa_townhouse', label: 'Villa / Townhouse' },
+      { value: 'apartment',       label: 'Apartment' },
+    ],
+    validation:   (v) => (v) ? null : 'Property type is required',
+    visibleWhen:  () => true,
+  },
+
   // ══════════════════════════════════════════════════════════════════════════
   // Section A — Rental income & assumptions
   // ══════════════════════════════════════════════════════════════════════════
