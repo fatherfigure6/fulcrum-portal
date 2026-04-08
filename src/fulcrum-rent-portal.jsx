@@ -102,7 +102,7 @@ function normaliseCashflowRequest(row) {
     createdAt:     row.created_at ? new Date(row.created_at).getTime() : null,
     completedAt:   null,
     entityType:    row.entity_type,
-    source: null, brokerId: null, brokerName: '', brokerEmail: '', brokerCompany: '',
+    source: null, brokerId: row.broker_id, brokerName: '', brokerEmail: '', brokerCompany: '',
     clientName: '', clientEmail: '', clientMobile: '', internalNotes: '', notes: '',
     strategies: [],
   };
@@ -123,7 +123,7 @@ async function loadRequests() {
       .order('created_at', { ascending: false }),
     supabase
       .from('cashflow_reports')
-      .select('id, created_at, status, property_address, entity_type, is_public, revoked_at')
+      .select('id, created_at, status, property_address, entity_type, is_public, revoked_at, broker_id')
       .order('created_at', { ascending: false }),
   ]);
   if (reqResult.error) throw reqResult.error;
