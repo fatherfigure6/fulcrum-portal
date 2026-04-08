@@ -127,6 +127,7 @@ async function loadRequests() {
       .order('created_at', { ascending: false }),
   ]);
   if (reqResult.error) throw reqResult.error;
+  if (cfResult.error) console.error('[loadRequests] cashflow_reports query failed:', cfResult.error);
   const requests  = (reqResult.data ?? []).map(normaliseRequest);
   const cashflows = (cfResult.data  ?? []).map(normaliseCashflowRequest);
   return [...requests, ...cashflows].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
