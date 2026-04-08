@@ -69,6 +69,7 @@ html,body,#root { height:100%; background:var(--grey-100); color:var(--ink); fon
 .badge-cma      { background:#e4eef0; color:#1a5a65; }
 .badge-pdr      { background:#eaecf5; color:#3a4a80; }
 .badge-referral { background:#fef3e2; color:#7a4a00; }
+.badge-cashflow { background:#e8f3ec; color:#1a5c2a; }
 /* PDR fulfilment UI */
 .pdr-section-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#aaa; margin-bottom:12px; }
 .strategy-card { border:1px solid var(--border-strong); border-radius:8px; padding:16px; margin-bottom:12px; }

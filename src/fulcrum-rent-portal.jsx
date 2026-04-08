@@ -91,20 +91,45 @@ function normaliseRequest(row) {
   };
 }
 
+function normaliseCashflowRequest(row) {
+  return {
+    id:            row.id,
+    type:          'cashflow',
+    request_type:  'cashflow',
+    status:        row.status,
+    address:       row.property_address,
+    downloadUrl:   (row.is_public && !row.revoked_at) ? `/report?id=${row.id}` : null,
+    createdAt:     row.created_at ? new Date(row.created_at).getTime() : null,
+    completedAt:   null,
+    entityType:    row.entity_type,
+    source: null, brokerId: null, brokerName: '', brokerEmail: '', brokerCompany: '',
+    clientName: '', clientEmail: '', clientMobile: '', internalNotes: '', notes: '',
+    strategies: [],
+  };
+}
+
 async function loadRequests() {
-  const { data, error } = await supabase
-    .from('requests')
-    .select(`
-      *,
-      request_rent_details(*),
-      request_cma_details(*),
-      request_referral_details(*),
-      request_pdr_details(*),
-      pdr_strategies(*)
-    `)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(normaliseRequest);
+  const [reqResult, cfResult] = await Promise.all([
+    supabase
+      .from('requests')
+      .select(`
+        *,
+        request_rent_details(*),
+        request_cma_details(*),
+        request_referral_details(*),
+        request_pdr_details(*),
+        pdr_strategies(*)
+      `)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('cashflow_reports')
+      .select('id, created_at, status, property_address, entity_type, is_public, revoked_at')
+      .order('created_at', { ascending: false }),
+  ]);
+  if (reqResult.error) throw reqResult.error;
+  const requests  = (reqResult.data ?? []).map(normaliseRequest);
+  const cashflows = (cfResult.data  ?? []).map(normaliseCashflowRequest);
+  return [...requests, ...cashflows].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 
@@ -836,7 +861,7 @@ export default function App() {
           {/* ── Cashflow Analysis ── */}
           <Route path="cashflow/new" element={
             session?.role === "broker"
-              ? <BrokerRequestForm supabase={supabase} session={session} onNotify={onCashflowNotify} />
+              ? <BrokerRequestForm supabase={supabase} session={session} onNotify={onCashflowNotify} onComplete={() => { refreshRequests(); navigate('/requests'); }} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="cashflow/staff/new" element={
@@ -1163,12 +1188,9 @@ function AppShell({ session, onLogout, requests, users }) {
     { path:"/staff",         icon:"🔐", label:"Staff Accounts" },
   ];
   const brokerNav = [
-    { path:"/dashboard",             icon:"🏠", label:"Dashboard" },
-    { path:"/requests/new",          icon:"✏️",  label:"New Request" },
-    { path:"/requests",              icon:"📋", label:"My Requests" },
-    { section:"Cashflow Analysis" },
-    { path:"/cashflow/new",          icon:"📈", label:"New Cashflow Request" },
-    { path:"/cashflow",              icon:"📊", label:"My Cashflow Reports" },
+    { path:"/dashboard",    icon:"🏠", label:"Dashboard" },
+    { path:"/requests/new", icon:"✏️",  label:"New Request" },
+    { path:"/requests",     icon:"📋", label:"My Requests" },
   ];
   const nav = isStaff ? adminNav : brokerNav;
   const navItems = nav.filter(n => !n.section);
@@ -1875,6 +1897,11 @@ function NewRequest({ onSubmit, session }) {
               <div className="type-card-title">Client Referral</div>
               <div className="type-card-desc">Refer a client to Fulcrum Australia for professional property buying services. Our buyers agency team will follow up directly with your client.</div>
             </div>
+            <div className="type-card" onClick={() => navigate("/cashflow/new")} style={{cursor:"pointer"}}>
+              <div className="type-card-icon">📈</div>
+              <div className="type-card-title">Cashflow Analysis</div>
+              <div className="type-card-desc">Model the rental income, expenses, and long-term cashflow for an investment property purchase.</div>
+            </div>
           </div>
         </div>
       )}
@@ -2039,7 +2066,7 @@ function BrokerRequests({ requests }) {
   if (typeFilter !=="all") filtered = filtered.filter(r=>r.type===typeFilter);
   return (
     <>
-      <div className="page-header"><div className="page-title">My Requests</div><div className="page-sub">All your rent letter and Price Check requests in one place</div></div>
+      <div className="page-header"><div className="page-title">My Requests</div><div className="page-sub">All your requests in one place</div></div>
       <div className="card">
         <div className="row" style={{marginBottom:16,gap:10,flexWrap:"wrap"}}>
           <div className="row" style={{gap:6}}>
@@ -2049,7 +2076,7 @@ function BrokerRequests({ requests }) {
           </div>
           <div style={{width:1,height:24,background:"var(--border)"}} />
           <div className="row" style={{gap:6}}>
-            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 Price Check"],["referral","🤝 Referral"]].map(([v,l])=>(
+            {[["all","All Types"],["rent","📄 Rent"],["cma","🏡 Price Check"],["pdr","🔍 PDR"],["cashflow","📈 Cashflow Analysis"],["referral","🤝 Referral"]].map(([v,l])=>(
               <button key={v} className="btn btn-secondary btn-sm" onClick={()=>setTypeFilter(v)}
                 style={{borderColor:typeFilter===v?"var(--primary)":"var(--border-strong)",fontWeight:typeFilter===v?700:400}}>{l}</button>
             ))}
@@ -2063,7 +2090,7 @@ function BrokerRequests({ requests }) {
                 <tr key={r.id}>
                   <td><TypeBadge t={r.type} /></td>
                   <td style={{fontSize:13,maxWidth:200}}>{r.address}</td>
-                  <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":r.type==="referral"?r.clientName||"Client":fmtMoney(r.expectedValue)}</span></td>
+                  <td><span className="tag">{r.type==="rent"?`$${r.weeklyRent}/wk`:r.type==="pdr"?r.clientName||"Client":r.type==="referral"?r.clientName||"Client":r.type==="cashflow"?(r.entityType?r.entityType.replace(/_/g,' '):"Investment"):fmtMoney(r.expectedValue)}</span></td>
                   <td style={{fontSize:13,color:"#888"}}>{fmt(r.createdAt)}</td>
                   <td><StatusBadge s={r.status} /></td>
                   <td>{r.status==="complete"&&r.downloadUrl
@@ -2105,6 +2132,7 @@ function StatusBadge({ s }) {
   return <span className={`badge ${cls}`}>{label}</span>;
 }
 function TypeBadge({ t }) {
+  if (t==="cashflow") return <span className="badge badge-cashflow">📈 Cashflow Analysis</span>;
   if (t==="cma")      return <span className="badge badge-cma">🏡 Price Check</span>;
   if (t==="pdr")      return <span className="badge badge-pdr">🔍 PDR</span>;
   if (t==="referral") return <span className="badge badge-referral">🤝 Referral</span>;
