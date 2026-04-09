@@ -309,8 +309,9 @@ async function buildRentLetterPdf({ propertyAddress, rentLow, rentHigh, signator
   const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
   const headerImage  = await pdfDoc.embedPng(headerPngBytes);
-  const headerHeight = 130;
-  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width, height: headerHeight });
+  const headerDims   = headerImage.scale(width / headerImage.width); // scale to page width, preserve aspect ratio
+  const headerHeight = headerDims.height;
+  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width: headerDims.width, height: headerHeight });
 
   let y = height - headerHeight - 50;
   const lineH    = 18;
