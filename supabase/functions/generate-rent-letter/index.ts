@@ -106,10 +106,21 @@ Deno.serve(async (req: Request) => {
   try {
     // 1. Authentication
     const authHeader = req.headers.get("Authorization");
+    console.log("Authorization header present:", !!authHeader);
+    console.log("Authorization header starts with Bearer:", authHeader?.startsWith("Bearer "));
+
     if (!authHeader?.startsWith("Bearer ")) {
+      console.error("Missing or malformed Authorization header");
       return new Response("Unauthorized", { status: 401, headers: corsHeaders });
     }
-    const token = authHeader.replace("Bearer ", "");
+
+    const token = authHeader.replace("Bearer ", "").trim();
+    console.log("Token present after extraction:", !!token);
+
+    if (!token) {
+      console.error("Bearer token missing after extraction");
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    }
 
     // Use service role client to validate token — same pattern as generate-cashflow-report
     const adminClient = createClient(
@@ -120,17 +131,24 @@ Deno.serve(async (req: Request) => {
 
     const { data: userData, error: authError } = await adminClient.auth.getUser(token);
     if (authError || !userData?.user) {
+      console.error("Auth failed:", authError?.message, "user:", userData?.user?.id);
       return new Response("Unauthorized", { status: 401, headers: corsHeaders });
     }
 
-    // 2. Authorisation — must be staff
-    const { data: profile } = await adminClient
+    // 2. Authorisation — must be staff or admin
+    console.log("Checking profile for user:", userData.user.id);
+    const { data: profile, error: profileError } = await adminClient
       .from("profiles")
       .select("role")
       .eq("id", userData.user.id)
       .single();
 
-    if (!profile || profile.role !== "staff") {
+    if (profileError) {
+      console.error("Profile lookup error:", profileError.message);
+    }
+
+    if (!profile || !["staff", "admin"].includes(profile.role)) {
+      console.error("Profile check failed:", profileError?.message, "profile:", profile);
       return new Response("Forbidden", { status: 403, headers: corsHeaders });
     }
 
@@ -142,7 +160,7 @@ Deno.serve(async (req: Request) => {
     const payload = raw as GenerateLetterPayload;
 
     // 4. Fetch letterhead asset — fail explicitly if missing
-    const { data: assetData } = supabase.storage
+    const { data: assetData } = adminClient.storage
       .from("prm-assets")
       .getPublicUrl("prm-letterhead-header.png");
 
