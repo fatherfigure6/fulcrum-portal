@@ -832,7 +832,7 @@ export default function App() {
           } />
           <Route path="rent-requests" element={
             session?.role === "staff"
-              ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="rent" />
+              ? <AdminRequests requests={rentReqs} onUpdate={updateRequest} onDelete={deleteRequest} type="rent" session={session} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="price-check-requests" element={
@@ -1350,14 +1350,315 @@ function AdminDashboard({ requests, users }) {
 }
 
 
+// ── Generate Rent Letter Modal ────────────────────────────────────────────────
+function GenerateRentLetterModal({ request, session, onClose }) {
+  const today = new Date().toISOString().split('T')[0];
+  const INITIAL_FORM = {
+    propertyAddress: request.address || '',
+    rentLow:         '',
+    rentHigh:        '',
+    signatoryName:   session.name  || '',
+    signatoryPhone:  session.phone || '',
+    signatoryEmail:  session.email || '',
+    letterDate:      today,
+  };
+  const [form,            setForm]            = useState(INITIAL_FORM);
+  const [cmaFile,         setCmaFile]         = useState(null);
+  const [step,            setStep]            = useState('idle');
+  const [errors,          setErrors]          = useState({});
+  const [errorMsg,        setErrorMsg]        = useState('');
+  const [isGenerating,    setIsGenerating]    = useState(false);
+  const [resultSignedUrl, setResultSignedUrl] = useState('');
+
+  const stepLabels = {
+    'uploading-cma':    'Uploading CMA…',
+    'generating':       'Generating letter…',
+    'uploading-letter': 'Uploading letter…',
+    'saving':           'Saving record…',
+  };
+  const isInProgress = ['uploading-cma', 'generating', 'uploading-letter', 'saving'].includes(step);
+
+  const onChange = (field, value) => setForm(f => ({ ...f, [field]: value }));
+
+  const validate = () => {
+    const e = {};
+    if (!form.propertyAddress.trim()) e.propertyAddress = 'Required';
+    const low  = parseInt(form.rentLow,  10);
+    const high = parseInt(form.rentHigh, 10);
+    if (!form.rentLow  || isNaN(low)  || low  <  50 || low  > 10000) e.rentLow  = 'Must be 50–10,000';
+    if (!form.rentHigh || isNaN(high) || high < low || high > 10000) e.rentHigh = 'Must be ≥ rent low and ≤ 10,000';
+    if (!form.signatoryName.trim())  e.signatoryName  = 'Required';
+    if (!form.signatoryPhone.trim()) e.signatoryPhone = 'Required';
+    if (!form.signatoryEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.signatoryEmail)) e.signatoryEmail = 'Valid email required';
+    if (!form.letterDate) e.letterDate = 'Required';
+    return e;
+  };
+
+  const handleGenerate = async () => {
+    if (isGenerating) return;
+    const e = validate();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setIsGenerating(true);
+    setErrorMsg('');
+
+    const now  = Date.now();
+    const yyyy = new Date().getFullYear();
+    const mm   = String(new Date().getMonth() + 1).padStart(2, '0');
+    let cmaPath = null;
+
+    try {
+      // Step 1 — Upload CMA (optional)
+      if (cmaFile) {
+        setStep('uploading-cma');
+        cmaPath = `${yyyy}/${mm}/${request.id}_${now}_cma.pdf`;
+        const { error: cmaError } = await supabase.storage
+          .from('cma-uploads')
+          .upload(cmaPath, cmaFile, { contentType: 'application/pdf' });
+        if (cmaError) throw new Error(`CMA upload failed: ${cmaError.message}`);
+      }
+
+      // Step 2 — Generate PDF via edge function
+      setStep('generating');
+      const { data: { session: authSession } } = await supabase.auth.getSession();
+      const edgeFnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rent-letter`;
+      const genResp = await fetch(edgeFnUrl, {
+        method:  'POST',
+        headers: {
+          'Authorization': `Bearer ${authSession.access_token}`,
+          'Content-Type':  'application/json',
+        },
+        body: JSON.stringify({
+          propertyAddress: form.propertyAddress.trim(),
+          rentLow:         parseInt(form.rentLow,  10),
+          rentHigh:        parseInt(form.rentHigh, 10),
+          signatoryName:   form.signatoryName.trim(),
+          signatoryPhone:  form.signatoryPhone.trim(),
+          signatoryEmail:  form.signatoryEmail.trim(),
+          letterDate:      form.letterDate,
+        }),
+      });
+
+      if (!genResp.ok) {
+        const body = await genResp.json().catch(() => ({}));
+        if (genResp.status === 403) throw new Error('Permission denied. You must be a staff member to generate letters.');
+        if (genResp.status === 422) throw new Error(body.error || 'Letter content exceeds single page. Shorten the property address.');
+        throw new Error(body.error || `Generation failed (${genResp.status})`);
+      }
+
+      const pdfBytes = await genResp.arrayBuffer();
+
+      // Step 3 — Upload letter PDF
+      setStep('uploading-letter');
+      const { count: existingCount } = await supabase
+        .from('rent_letters')
+        .select('*', { count: 'exact', head: true })
+        .eq('request_id', request.id);
+      const versionNumber = (existingCount ?? 0) + 1;
+
+      const letterPath = `${yyyy}/${mm}/${request.id}_${now}_v${versionNumber}.pdf`;
+      const { error: letterError } = await supabase.storage
+        .from('rent-letters')
+        .upload(letterPath, pdfBytes, { contentType: 'application/pdf' });
+      if (letterError) {
+        console.error('ORPHAN_FILE', { bucket: 'cma-uploads', path: cmaPath, requestId: request.id, reason: 'letter upload failed' });
+        throw new Error(`Letter upload failed: ${letterError.message}`);
+      }
+
+      // Step 4 — Save DB record
+      setStep('saving');
+      const { error: insertError } = await supabase.from('rent_letters').insert({
+        request_id:             request.id,
+        property_address:       form.propertyAddress.trim(),
+        rent_low:               parseInt(form.rentLow,  10),
+        rent_high:              parseInt(form.rentHigh, 10),
+        signatory_name:         form.signatoryName.trim(),
+        signatory_phone:        form.signatoryPhone.trim(),
+        signatory_email:        form.signatoryEmail.trim(),
+        version_number:         versionNumber,
+        cma_storage_path:       cmaPath,
+        cma_original_filename:  cmaFile?.name ?? null,
+        cma_file_size_bytes:    cmaFile?.size ?? null,
+        letter_storage_path:    letterPath,
+        letter_file_size_bytes: pdfBytes.byteLength,
+        generated_by:           session.id,
+        letter_date:            form.letterDate,
+      });
+
+      if (insertError) {
+        await supabase.storage.from('rent-letters').remove([letterPath]).catch(() => {
+          console.error('ORPHAN_FILE', {
+            bucket: 'rent-letters', path: letterPath,
+            requestId: request.id, userId: session.id,
+            timestamp: new Date().toISOString(), reason: 'DB insert failed after PDF upload',
+          });
+        });
+        throw new Error(`Failed to save record: ${insertError.message}`);
+      }
+
+      const { data: signedData } = await supabase.storage
+        .from('rent-letters')
+        .createSignedUrl(letterPath, 3600);
+      setResultSignedUrl(signedData?.signedUrl || '');
+      setStep('success');
+
+    } catch (err) {
+      setErrorMsg(err.message || 'An unexpected error occurred.');
+      setStep('error');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const resetForNewVersion = () => {
+    setStep('idle'); setErrorMsg(''); setErrors({});
+    setCmaFile(null); setResultSignedUrl('');
+  };
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && !isInProgress && onClose()}>
+      <div className="modal" style={{maxWidth:520,overflowY:'auto',maxHeight:'90vh'}}>
+        <div className="modal-title">Generate Rent Letter</div>
+
+        {step === 'success' ? (
+          <div>
+            <div className="alert alert-success" style={{marginBottom:16}}>
+              Letter generated! The download link expires in 1 hour.
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+              {resultSignedUrl && (
+                <a href={resultSignedUrl} download="rent-letter.pdf" className="btn btn-primary">
+                  Download Letter
+                </a>
+              )}
+              <button className="btn btn-secondary" onClick={resetForNewVersion}>Generate New Version</button>
+              <button className="btn btn-secondary" onClick={onClose}>Close</button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="field">
+              <label>Property Address *</label>
+              <input value={form.propertyAddress}
+                onChange={e => onChange('propertyAddress', e.target.value)}
+                placeholder="123 Example St, Perth WA 6000" />
+              {errors.propertyAddress && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.propertyAddress}</div>}
+            </div>
+
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
+              <div className="field">
+                <label>Rent Low ($/wk) *</label>
+                <input type="number" min="50" max="10000"
+                  value={form.rentLow} onChange={e => onChange('rentLow', e.target.value)}
+                  placeholder="450" />
+                {errors.rentLow && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.rentLow}</div>}
+              </div>
+              <div className="field">
+                <label>Rent High ($/wk) *</label>
+                <input type="number" min="50" max="10000"
+                  value={form.rentHigh} onChange={e => onChange('rentHigh', e.target.value)}
+                  placeholder="500" />
+                {errors.rentHigh && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.rentHigh}</div>}
+              </div>
+            </div>
+
+            <div className="divider" />
+
+            <div style={{fontWeight:600,fontSize:13,color:'var(--primary)',marginBottom:10,letterSpacing:.2}}>Signatory</div>
+            <div className="field">
+              <label>Name *</label>
+              <input value={form.signatoryName} onChange={e => onChange('signatoryName', e.target.value)} />
+              {errors.signatoryName && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.signatoryName}</div>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'0 16px'}}>
+              <div className="field">
+                <label>Phone *</label>
+                <input value={form.signatoryPhone}
+                  onChange={e => onChange('signatoryPhone', e.target.value)}
+                  placeholder="08 6158 9924" />
+                {errors.signatoryPhone && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.signatoryPhone}</div>}
+              </div>
+              <div className="field">
+                <label>Email *</label>
+                <input type="email" value={form.signatoryEmail}
+                  onChange={e => onChange('signatoryEmail', e.target.value)} />
+                {errors.signatoryEmail && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.signatoryEmail}</div>}
+              </div>
+            </div>
+
+            <div className="divider" />
+
+            <div className="field">
+              <label>Letter Date *</label>
+              <input type="date" value={form.letterDate}
+                onChange={e => onChange('letterDate', e.target.value)} />
+              {errors.letterDate && <div style={{fontSize:12,color:'#e07070',marginTop:4}}>{errors.letterDate}</div>}
+            </div>
+
+            <div className="field">
+              <label>
+                CMA / Market Evidence
+                <span style={{fontWeight:400,color:'#bbb',marginLeft:6}}>(PDF, optional — max 20MB)</span>
+              </label>
+              <input type="file" accept="application/pdf" onChange={e => {
+                const f = e.target.files?.[0];
+                if (f && f.size > 20 * 1024 * 1024) { alert('CMA file must be under 20MB.'); e.target.value = ''; return; }
+                setCmaFile(f || null);
+              }} />
+              {cmaFile && (
+                <div style={{fontSize:12,color:'#888',marginTop:4}}>
+                  {cmaFile.name} ({(cmaFile.size / 1024).toFixed(0)} KB)
+                </div>
+              )}
+              <div className="hint">The CMA (Comparative Market Analysis) is your supporting evidence for the rent range — e.g. an RP Data PDF.</div>
+            </div>
+
+            {isInProgress && (
+              <div className="alert" style={{background:'#f0f4ff',color:'#3a5cc7',marginBottom:12,border:'1px solid #c7d5f5'}}>
+                {stepLabels[step]}
+              </div>
+            )}
+            {step === 'error' && (
+              <div className="alert alert-error" style={{marginBottom:12}}>{errorMsg}</div>
+            )}
+
+            <div style={{display:'flex',justifyContent:'space-between',gap:10,marginTop:8}}>
+              <button className="btn btn-secondary" onClick={onClose} disabled={isInProgress}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleGenerate}
+                disabled={isGenerating} aria-busy={isGenerating}>
+                {isGenerating ? (stepLabels[step] || 'Processing…') : 'Generate Letter'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Admin / CMA Requests (shared, type-aware) ─────────────────────────────────
-function AdminRequests({ requests, onUpdate, onDelete, type }) {
+function AdminRequests({ requests, onUpdate, onDelete, type, session }) {
   const isRent = type === "rent";
-  const [selected,  setSelected]  = useState(null);
-  const [filter,    setFilter]    = useState("all");
-  const [uploadUrl, setUploadUrl] = useState("");
-  const [notifSent, setNotifSent] = useState(false);
+  const [selected,           setSelected]           = useState(null);
+  const [filter,             setFilter]             = useState("all");
+  const [uploadUrl,          setUploadUrl]          = useState("");
+  const [notifSent,          setNotifSent]          = useState(false);
+  const [showLetterModal,    setShowLetterModal]    = useState(false);
+  const [rentLetterCount,    setRentLetterCount]    = useState(0);
   const filtered = filter==="all" ? requests : requests.filter(r=>r.status===filter);
+
+  // Load existing letter count whenever a rent request is selected
+  useEffect(() => {
+    if (!isRent || !selected?.id) { setRentLetterCount(0); return; }
+    supabase
+      .from('rent_letters')
+      .select('*', { count: 'exact', head: true })
+      .eq('request_id', selected.id)
+      .then(({ count }) => setRentLetterCount(count ?? 0))
+      .catch(() => setRentLetterCount(0));
+  }, [selected?.id, isRent]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const markComplete = async req => {
     if (!uploadUrl.trim()) return alert("Please enter a download URL for the completed document.");
     await onUpdate(req.id, { status:"complete", completedAt:Date.now(), downloadUrl:uploadUrl.trim() });
@@ -1434,6 +1735,25 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
               }
               {selected.notes && <Detail label="Notes" val={selected.notes} full />}
             </div>
+            {/* Rent letter generation — staff only, rent requests only */}
+            {isRent && session && (
+              <>
+                <div className="divider" />
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
+                  <div>
+                    <div style={{fontWeight:600,fontSize:13,color:'var(--primary)'}}>Rent Letter</div>
+                    {rentLetterCount > 0 && (
+                      <div style={{fontSize:12,color:'#888',marginTop:2}}>
+                        {rentLetterCount} version{rentLetterCount !== 1 ? 's' : ''} generated
+                      </div>
+                    )}
+                  </div>
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowLetterModal(true)}>
+                    {rentLetterCount === 0 ? 'Generate Rent Letter' : 'Generate New Version'}
+                  </button>
+                </div>
+              </>
+            )}
             <div className="divider" />
             {notifSent
               ? <div className="alert alert-success">✅ Marked complete! Broker has been notified.</div>
@@ -1459,6 +1779,22 @@ function AdminRequests({ requests, onUpdate, onDelete, type }) {
             }
           </div>
         </div>
+      )}
+      {showLetterModal && selected && session && (
+        <GenerateRentLetterModal
+          request={selected}
+          session={session}
+          onClose={() => {
+            setShowLetterModal(false);
+            // Refresh letter count after modal closes
+            supabase
+              .from('rent_letters')
+              .select('*', { count: 'exact', head: true })
+              .eq('request_id', selected.id)
+              .then(({ count }) => setRentLetterCount(count ?? 0))
+              .catch(() => {});
+          }}
+        />
       )}
     </>
   );
