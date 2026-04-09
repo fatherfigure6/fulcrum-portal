@@ -308,10 +308,19 @@ async function buildRentLetterPdf({ propertyAddress, rentLow, rentHigh, signator
   const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
+  // Use browser Image to get true natural pixel dimensions — avoids pdf-lib DPI misinterpretation
+  const naturalDims = await new Promise((resolve, reject) => {
+    const blob   = new Blob([headerPngBytes], { type: 'image/png' });
+    const blobUrl = URL.createObjectURL(blob);
+    const img    = new Image();
+    img.onload  = () => { resolve({ w: img.naturalWidth, h: img.naturalHeight }); URL.revokeObjectURL(blobUrl); };
+    img.onerror = () => { URL.revokeObjectURL(blobUrl); reject(new Error('Failed to decode letterhead image')); };
+    img.src = blobUrl;
+  });
+
   const headerImage  = await pdfDoc.embedPng(headerPngBytes);
-  const headerDims   = headerImage.scale(width / headerImage.width); // scale to page width, preserve aspect ratio
-  const headerHeight = headerDims.height;
-  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width: headerDims.width, height: headerHeight });
+  const headerHeight = (naturalDims.h / naturalDims.w) * width; // proportional height at full page width
+  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width, height: headerHeight });
 
   let y = height - headerHeight - 50;
   const lineH    = 18;
