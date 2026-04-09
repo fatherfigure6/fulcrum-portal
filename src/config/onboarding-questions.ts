@@ -14,7 +14,7 @@
 //     must be kept in sync with this file manually when questions change.
 // =============================================================================
 
-export const QUESTIONNAIRE_VERSION = "2.0";
+export const QUESTIONNAIRE_VERSION = "2.1";
 
 export interface OnboardingQuestion {
   id: string;         // Stable snake_case key — NEVER rename in production
@@ -28,16 +28,6 @@ export interface OnboardingQuestion {
 }
 
 export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
-
-  // ── Ownership Structure ────────────────────────────────────────────────────
-  {
-    id:       "ownership_arrangement",
-    label:    "How would you like property ownership arranged?",
-    type:     "radio",
-    required: true,
-    section:  "Ownership Structure",
-    options:  ["Joint Tenants", "Tenants In Common"],
-  },
 
   // ── Finance ───────────────────────────────────────────────────────────────
   {

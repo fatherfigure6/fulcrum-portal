@@ -33,7 +33,7 @@ const corsHeaders = {
 // When questions are added or removed, update both files and bump QUESTIONNAIRE_VERSION.
 // =============================================================================
 
-const QUESTIONNAIRE_VERSION = "2.0";
+const QUESTIONNAIRE_VERSION = "2.1";
 
 interface QuestionMeta {
   id: string;
@@ -45,15 +45,6 @@ interface QuestionMeta {
 }
 
 const QUESTIONS: QuestionMeta[] = [
-  // ── Ownership Structure ────────────────────────────────────────────────────
-  {
-    id: "ownership_arrangement",
-    label: "How would you like property ownership arranged?",
-    section: "Ownership Structure",
-    type: "radio",
-    required: true,
-    options: ["Joint Tenants", "Tenants In Common"],
-  },
   // ── Finance ───────────────────────────────────────────────────────────────
   {
     id: "lender_name",
