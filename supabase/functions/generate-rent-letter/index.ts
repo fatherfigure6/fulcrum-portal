@@ -107,22 +107,28 @@ serve(async (req: Request) => {
   try {
     // 1. Authentication
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    }
+    const token = authHeader.replace("Bearer ", "");
 
-    const supabase = createClient(
+    // Use service role client to validate token — same pattern as generate-cashflow-report
+    const adminClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: authHeader } } },
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    const { data: userData, error: authError } = await adminClient.auth.getUser(token);
+    if (authError || !userData?.user) {
+      return new Response("Unauthorized", { status: 401, headers: corsHeaders });
+    }
 
     // 2. Authorisation — must be staff
-    const { data: profile } = await supabase
+    const { data: profile } = await adminClient
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", userData.user.id)
       .single();
 
     if (!profile || profile.role !== "staff") {
