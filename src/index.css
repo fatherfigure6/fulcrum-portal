@@ -70,6 +70,14 @@ html,body,#root { height:100%; background:var(--grey-100); color:var(--ink); fon
 .badge-pdr      { background:#eaecf5; color:#3a4a80; }
 .badge-referral { background:#fef3e2; color:#7a4a00; }
 .badge-cashflow { background:#e8f3ec; color:#1a5c2a; }
+.badge-submitted   { background:#e8f0f5; color:#2a4a70; }
+.badge-active      { background:#e4ede8; color:#2a5c3a; }
+.badge-synced      { background:#e4ede8; color:#2a5c3a; }
+.badge-sync-failed { background:#f5e8e8; color:#8b2020; }
+
+.onboarding-progress { display:flex; gap:4px; margin-bottom:24px; }
+.onboarding-progress-segment { height:4px; flex:1; border-radius:2px; background:#e0e0e0; transition:background 0.2s; }
+.onboarding-progress-segment.filled { background:var(--teal); }
 /* PDR fulfilment UI */
 .pdr-section-label { font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#aaa; margin-bottom:12px; }
 .strategy-card { border:1px solid var(--border-strong); border-radius:8px; padding:16px; margin-bottom:12px; }

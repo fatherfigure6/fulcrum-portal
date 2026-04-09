@@ -11,6 +11,9 @@ import BrokerRequestForm     from './features/cashflow/components/BrokerRequestF
 import StaffCompletionForm  from './features/cashflow/components/StaffCompletionForm.jsx';
 import CashflowDashboard    from './features/cashflow/components/CashflowDashboard.jsx';
 import CashflowReportPage   from './features/cashflow/components/CashflowReport.jsx';
+import OnboardingForm       from './features/onboarding/components/OnboardingForm.jsx';
+import ClientsSection       from './features/onboarding/components/ClientsSection.jsx';
+import ClientDetail         from './features/onboarding/components/ClientDetail.jsx';
 
 // ── Supabase ──────────────────────────────────────────────────────────────────
 const supabase = createClient(
@@ -364,9 +367,10 @@ function ProtectedRoute({ session, isLoading, children }) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const [users,    setUsers]    = useState([]);
-  const [requests, setRequests] = useState([]);
-  const [session,  setSession]  = useState(null);
+  const [users,               setUsers]               = useState([]);
+  const [requests,            setRequests]            = useState([]);
+  const [session,             setSession]             = useState(null);
+  const [pendingClientsCount, setPendingClientsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall,   setShowInstall]   = useState(false);
@@ -437,6 +441,12 @@ export default function App() {
           loadUsers().catch(err => {
             console.error("[loadUsers] failed:", err);
           });
+          supabase
+            .from("clients")
+            .select("*", { count: "exact", head: true })
+            .eq("status", "pending")
+            .then(({ count }) => setPendingClientsCount(count ?? 0))
+            .catch(() => {});
         }
       } catch (err) {
         console.error("[loadProfile] failed:", err);
@@ -801,6 +811,7 @@ export default function App() {
         <Route path="/reset-password"  element={<ResetPasswordScreen onResetPassword={resetPassword} onSignOut={() => supabase.auth.signOut()} />} />
         <Route path="/pdr"             element={<PDRPublicForm />} />
         <Route path="/report"          element={<CashflowReportPage />} />
+        <Route path="/onboard"         element={<OnboardingForm />} />
 
         <Route path="/change-password" element={
           <ProtectedRoute session={session} isLoading={isLoading}>
@@ -810,7 +821,7 @@ export default function App() {
 
         <Route path="/" element={
           <ProtectedRoute session={session} isLoading={isLoading}>
-            <AppShell session={session} onLogout={logout} requests={requests} users={users} />
+            <AppShell session={session} onLogout={logout} requests={requests} users={users} pendingClientsCount={pendingClientsCount} supabase={supabase} />
           </ProtectedRoute>
         }>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -884,6 +895,18 @@ export default function App() {
           } />
           <Route path="cashflow" element={
             <CashflowDashboard supabase={supabase} session={session} />
+          } />
+
+          {/* ── Clients / Onboarding ── */}
+          <Route path="clients" element={
+            session?.role === "staff"
+              ? <ClientsSection supabase={supabase} session={session} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="clients/:id" element={
+            session?.role === "staff"
+              ? <ClientDetail supabase={supabase} session={session} />
+              : <Navigate to="/dashboard" replace />
           } />
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -1161,7 +1184,7 @@ function ChangePasswordScreen({ onChangePassword }) {
 }
 
 // ── App Shell ─────────────────────────────────────────────────────────────────
-function AppShell({ session, onLogout, requests, users }) {
+function AppShell({ session, onLogout, requests, users, pendingClientsCount, supabase }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const dirtyRef = useRef(false);
@@ -1183,6 +1206,8 @@ function AppShell({ session, onLogout, requests, users }) {
     { path:"/pdr-reports",   icon:"🔍", label:"PD Reports",    badge:pendingPDR },
     { section:"Cashflow Analysis" },
     { path:"/cashflow",          icon:"📈", label:"Cashflow Reports" },
+    { section:"Clients" },
+    { path:"/clients",           icon:"👤", label:"Clients",          badge:pendingClientsCount },
     { section:"Referrals" },
     { path:"/referrals",     icon:"🤝", label:"Referrals",     badge:pendingReferrals },
     { section:"Admin" },
