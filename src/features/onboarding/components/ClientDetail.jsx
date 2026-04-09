@@ -170,6 +170,11 @@ export default function ClientDetail({ session, supabase }) {
   const [activating,   setActivating]   = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [retrying,     setRetrying]     = useState(false);
+  const [editing,      setEditing]      = useState(false);
+  const [editForm,     setEditForm]     = useState({});
+  const [editSaving,   setEditSaving]   = useState(false);
+  const [editError,    setEditError]    = useState(null);
+  const [deleting,     setDeleting]     = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -203,6 +208,57 @@ export default function ClientDetail({ session, supabase }) {
     // We can only show the link structure — we don't have the raw token
     // The raw token was shown once at creation. Staff must regenerate to get a new copyable link.
     alert('The raw token is not stored. Use "Regenerate Link" to generate a new copyable link.');
+  };
+
+  // ── Edit client details ───────────────────────────────────────────────────────
+  const handleStartEdit = () => {
+    setEditForm({ first_name: client.first_name, last_name: client.last_name, email: client.email, phone: client.phone });
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!editForm.first_name.trim()) return setEditError('First name is required.');
+    if (!editForm.last_name.trim())  return setEditError('Last name is required.');
+    if (!editForm.email.trim())      return setEditError('Email is required.');
+    if (!EMAIL_RE.test(editForm.email.trim())) return setEditError('Invalid email address.');
+    if (!editForm.phone.trim())      return setEditError('Phone is required.');
+
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({
+          first_name: editForm.first_name.trim(),
+          last_name:  editForm.last_name.trim(),
+          email:      editForm.email.trim().toLowerCase(),
+          phone:      editForm.phone.trim(),
+        })
+        .eq('id', clientId);
+      if (error) throw error;
+      setEditing(false);
+      await loadData();
+    } catch (err) {
+      setEditError(err.message ?? 'Failed to save. Please try again.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // ── Delete client ─────────────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!window.confirm(`Permanently delete ${client.first_name} ${client.last_name}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from('clients').delete().eq('id', clientId);
+      if (error) throw error;
+      navigate('/clients');
+    } catch (err) {
+      alert(err.message ?? 'Failed to delete client.');
+      setDeleting(false);
+    }
   };
 
   // ── Mark as Active ────────────────────────────────────────────────────────────
@@ -313,38 +369,86 @@ export default function ClientDetail({ session, supabase }) {
 
       {/* ── Panel 1: Profile ─────────────────────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary, #2c3e50)', marginBottom: 4 }}>
-              {client.first_name} {client.last_name}
+        {editing ? (
+          <>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary, #2c3e50)', marginBottom: 16 }}>Edit Client Details</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+              <div className="field">
+                <label>First Name</label>
+                <input value={editForm.first_name} onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
+              </div>
+              <div className="field">
+                <label>Last Name</label>
+                <input value={editForm.last_name} onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
+              </div>
             </div>
-            <StatusBadge status={client.status} />
-          </div>
-          {client.status === 'submitted' && (
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={handleMarkActive}
-              disabled={activating}
-            >
-              {activating ? 'Updating…' : 'Mark as Active'}
-            </button>
-          )}
-        </div>
+            <div className="field">
+              <label>Email Address</label>
+              <input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Phone Number</label>
+              <input type="tel" value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} />
+            </div>
+            {editError && (
+              <div style={{ padding: '8px 12px', background: '#fdf2f2', border: '1px solid #fca5a5', borderRadius: 4, fontSize: 13, color: '#b91c1c', marginBottom: 12 }}>
+                {editError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEditing(false)} disabled={editSaving}>Cancel</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={handleSaveEdit} disabled={editSaving}>
+                {editSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary, #2c3e50)', marginBottom: 4 }}>
+                  {client.first_name} {client.last_name}
+                </div>
+                <StatusBadge status={client.status} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {client.status === 'submitted' && (
+                  <button type="button" className="btn btn-primary btn-sm" onClick={handleMarkActive} disabled={activating}>
+                    {activating ? 'Updating…' : 'Mark as Active'}
+                  </button>
+                )}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={handleStartEdit}>
+                  Edit Details
+                </button>
+              </div>
+            </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', marginTop: 20 }}>
-          {[
-            ['Email',   client.email],
-            ['Phone',   client.phone],
-            ['Created', fmtDateShort(client.created_at)],
-            ...(client.status_updated_at ? [['Status updated', fmtDateShort(client.status_updated_at)]] : []),
-          ].map(([label, val]) => (
-            <div key={label}>
-              <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#999', fontWeight: 600, marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 14, color: '#333' }}>{val}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', marginTop: 20 }}>
+              {[
+                ['Email',   client.email],
+                ['Phone',   client.phone],
+                ['Created', fmtDateShort(client.created_at)],
+                ...(client.status_updated_at ? [['Status updated', fmtDateShort(client.status_updated_at)]] : []),
+              ].map(([label, val]) => (
+                <div key={label}>
+                  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#999', fontWeight: 600, marginBottom: 2 }}>{label}</div>
+                  <div style={{ fontSize: 14, color: '#333' }}>{val}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f0f0ee' }}>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                style={{ fontSize: 13, color: '#b91c1c', background: 'none', border: '1px solid #fca5a5', borderRadius: 4, padding: '5px 12px', cursor: 'pointer' }}
+              >
+                {deleting ? 'Deleting…' : 'Delete Client'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Panel 2: Onboarding Link ──────────────────────────────────────────── */}
