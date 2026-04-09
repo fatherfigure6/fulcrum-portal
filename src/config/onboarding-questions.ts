@@ -14,7 +14,7 @@
 //     must be kept in sync with this file manually when questions change.
 // =============================================================================
 
-export const QUESTIONNAIRE_VERSION = "1.0";
+export const QUESTIONNAIRE_VERSION = "2.0";
 
 export interface OnboardingQuestion {
   id: string;         // Stable snake_case key — NEVER rename in production
@@ -28,42 +28,6 @@ export interface OnboardingQuestion {
 }
 
 export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
-
-  // ── Purchaser Details ──────────────────────────────────────────────────────
-  {
-    id:          "purchaser_names",
-    label:       "Full name/s to appear on the Contract of Sale for all purchasers (including middle names)",
-    type:        "textarea",
-    required:    true,
-    section:     "Purchaser Details",
-    helpText:    "Please ensure spelling is correct — incorrect names on contracts can result in penalties in WA.",
-    placeholder: "e.g. John Michael Smith\nJane Elizabeth Smith",
-  },
-  {
-    id:          "entity_name",
-    label:       "SMSF / Trust / Company name to appear on the contract (if applicable)",
-    type:        "text",
-    required:    false,
-    section:     "Purchaser Details",
-    helpText:    "Please ensure spelling is correct — incorrect names on contracts can result in penalties in WA.",
-    placeholder: "Leave blank if not applicable",
-  },
-  {
-    id:          "residential_address",
-    label:       "Current residential address",
-    type:        "textarea",
-    required:    true,
-    section:     "Purchaser Details",
-    placeholder: "Street address, suburb, state, postcode",
-  },
-  {
-    id:          "purchaser_emails",
-    label:       "Email address/es for all purchasers",
-    type:        "textarea",
-    required:    true,
-    section:     "Purchaser Details",
-    placeholder: "e.g. john@email.com\njane@email.com",
-  },
 
   // ── Ownership Structure ────────────────────────────────────────────────────
   {
@@ -138,6 +102,7 @@ export const KNOWN_QUESTION_IDS: ReadonlySet<string> =
   new Set(ONBOARDING_QUESTIONS.map(q => q.id));
 
 export const ONBOARDING_SECTIONS: string[] = [
+  "Purchaser Details",
   ...new Set(ONBOARDING_QUESTIONS.map(q => q.section)),
 ];
 

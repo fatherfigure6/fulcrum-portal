@@ -37,6 +37,79 @@ function tokenStatus(token) {
   return { label: 'Active', badge: 'badge badge-active' };
 }
 
+// ── Purchaser Details summary (structured_v1) ─────────────────────────────────
+
+function ClientBlock({ label, client, showOwnershipPct }) {
+  const rows = [
+    ['Name',    [client.firstName, client.middleName, client.lastName].filter(Boolean).join(' ') || '—'],
+    ['Address', client.address || '—'],
+    ['Email',   client.email   || '—'],
+    ['Phone',   client.phone   || '—'],
+    ...(showOwnershipPct ? [['Ownership', client.ownershipPct != null ? `${client.ownershipPct}%` : '—']] : []),
+  ];
+  return (
+    <div style={{ marginBottom: 10 }}>
+      {label && <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {rows.map(([k, v]) => (
+          <div key={k} style={{ display: 'flex', gap: 16, padding: '8px 12px', background: '#f9f9f8', borderRadius: 3 }}>
+            <div style={{ flex: '0 0 40%', fontSize: 13, color: '#666' }}>{k}</div>
+            <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#333', wordBreak: 'break-word' }}>{v}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PurchaserDetailsSummary({ data }) {
+  if (!data || !data.entityType) {
+    return (
+      <div style={{ padding: '10px 12px', background: '#f9f9f8', borderRadius: 3, fontSize: 13, color: '#999' }}>
+        Purchaser details could not be rendered from this submission.
+      </div>
+    );
+  }
+
+  const entityLabels = {
+    individual:          'Individual',
+    joint_tenants:       'Joint Tenants',
+    tenants_in_common:   'Tenants in Common',
+    smsf:                'SMSF',
+  };
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 16, padding: '8px 12px', background: '#f9f9f8', borderRadius: 3, marginBottom: 8 }}>
+        <div style={{ flex: '0 0 40%', fontSize: 13, color: '#666' }}>Entity Type</div>
+        <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#333' }}>{entityLabels[data.entityType] ?? data.entityType}</div>
+      </div>
+
+      {data.entityType === 'individual' && data.individual && (
+        <ClientBlock client={data.individual} showOwnershipPct={false} />
+      )}
+
+      {(data.entityType === 'joint_tenants' || data.entityType === 'tenants_in_common') && Array.isArray(data.clients) && (
+        data.clients.map((c, i) => (
+          <ClientBlock
+            key={i}
+            label={`Client ${i + 1}`}
+            client={c}
+            showOwnershipPct={data.entityType === 'tenants_in_common'}
+          />
+        ))
+      )}
+
+      {data.entityType === 'smsf' && data.smsf && (
+        <div style={{ display: 'flex', gap: 16, padding: '8px 12px', background: '#f9f9f8', borderRadius: 3 }}>
+          <div style={{ flex: '0 0 40%', fontSize: 13, color: '#666' }}>SMSF Name</div>
+          <div style={{ flex: 1, fontSize: 13, fontWeight: 500, color: '#333', wordBreak: 'break-word' }}>{data.smsf.entityName || '—'}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }) {
@@ -375,6 +448,13 @@ export default function ClientDetail({ session, supabase }) {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {snapshot.filter(q => q.section === section).map(q => {
+                    if (q.type === 'structured_v1' && q.id === 'purchaser_details') {
+                      return (
+                        <div key={q.id}>
+                          <PurchaserDetailsSummary data={responses.purchaser_details} />
+                        </div>
+                      );
+                    }
                     const val = responses[q.id];
                     const display = (val === null || val === undefined || val === '') ? '—' : String(val);
                     return (

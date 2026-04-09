@@ -21,6 +21,7 @@ import {
   QUESTIONS_BY_SECTION,
   QUESTIONNAIRE_VERSION,
 } from '../../../config/onboarding-questions.ts';
+import PurchaserDetailsForm from './PurchaserDetailsForm.jsx';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
@@ -176,13 +177,14 @@ export default function OnboardingForm() {
 
   const getToken = () => new URLSearchParams(location.search).get('token') ?? '';
 
-  const [phase,       setPhase]       = useState('loading'); // loading | error | form | submitting | success
-  const [errorCode,   setErrorCode]   = useState(null);
-  const [firstName,   setFirstName]   = useState('');
-  const [sectionIdx,  setSectionIdx]  = useState(0);
-  const [responses,   setResponses]   = useState({});
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [submitError, setSubmitError] = useState(null);
+  const [phase,            setPhase]            = useState('loading'); // loading | error | form | submitting | success
+  const [errorCode,        setErrorCode]        = useState(null);
+  const [firstName,        setFirstName]        = useState('');
+  const [sectionIdx,       setSectionIdx]       = useState(0);
+  const [responses,        setResponses]        = useState({});
+  const [purchaserDetails, setPurchaserDetails] = useState(null);
+  const [fieldErrors,      setFieldErrors]      = useState({});
+  const [submitError,      setSubmitError]      = useState(null);
 
   // ── Validate token on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -286,6 +288,7 @@ export default function OnboardingForm() {
           },
           body: JSON.stringify({
             token,
+            purchaser_details: purchaserDetails,
             responses,
             questionnaire_version: QUESTIONNAIRE_VERSION,
           }),
@@ -326,9 +329,41 @@ export default function OnboardingForm() {
     return <SuccessScreen />;
   }
 
+  // ── Purchaser Details section (structured form — not generic question loop) ──
+  const currentSection = ONBOARDING_SECTIONS[sectionIdx];
+
+  if (phase === 'form' && currentSection === 'Purchaser Details') {
+    return (
+      <div style={{ maxWidth: 540, margin: '0 auto', padding: '24px 16px 48px' }}>
+        <ProgressBar currentIndex={sectionIdx} total={ONBOARDING_SECTIONS.length} />
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--teal, #1a7a8a)', marginBottom: 4 }}>
+            Step {sectionIdx + 1} of {ONBOARDING_SECTIONS.length}
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary, #2c3e50)' }}>
+            Purchaser Details
+          </div>
+          {firstName && (
+            <div style={{ fontSize: 15, color: '#6b7280', marginTop: 6 }}>
+              Welcome, {firstName}.
+            </div>
+          )}
+        </div>
+        <PurchaserDetailsForm
+          initialData={purchaserDetails}
+          onComplete={(payload) => {
+            setPurchaserDetails(payload);
+            setSectionIdx(ONBOARDING_SECTIONS.indexOf('Purchaser Details') + 1);
+            setFieldErrors({});
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      </div>
+    );
+  }
+
   // ── Form ─────────────────────────────────────────────────────────────────────
   const isSubmitting = phase === 'submitting';
-  const currentSection = ONBOARDING_SECTIONS[sectionIdx];
   const sectionQuestions = QUESTIONS_BY_SECTION[currentSection] ?? [];
   const isLastSection = sectionIdx === ONBOARDING_SECTIONS.length - 1;
 

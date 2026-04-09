@@ -33,7 +33,7 @@ const corsHeaders = {
 // When questions are added or removed, update both files and bump QUESTIONNAIRE_VERSION.
 // =============================================================================
 
-const QUESTIONNAIRE_VERSION = "1.0";
+const QUESTIONNAIRE_VERSION = "2.0";
 
 interface QuestionMeta {
   id: string;
@@ -45,35 +45,6 @@ interface QuestionMeta {
 }
 
 const QUESTIONS: QuestionMeta[] = [
-  // ── Purchaser Details ──────────────────────────────────────────────────────
-  {
-    id: "purchaser_names",
-    label: "Full name/s to appear on the Contract of Sale for all purchasers (including middle names)",
-    section: "Purchaser Details",
-    type: "textarea",
-    required: true,
-  },
-  {
-    id: "entity_name",
-    label: "SMSF / Trust / Company name to appear on the contract (if applicable)",
-    section: "Purchaser Details",
-    type: "text",
-    required: false,
-  },
-  {
-    id: "residential_address",
-    label: "Current residential address",
-    section: "Purchaser Details",
-    type: "textarea",
-    required: true,
-  },
-  {
-    id: "purchaser_emails",
-    label: "Email address/es for all purchasers",
-    section: "Purchaser Details",
-    type: "textarea",
-    required: true,
-  },
   // ── Ownership Structure ────────────────────────────────────────────────────
   {
     id: "ownership_arrangement",
@@ -140,13 +111,46 @@ const OPTIONS_MAP = new Map(
 );
 
 // Build the question_snapshot stored with each submission
-const QUESTION_SNAPSHOT = QUESTIONS.map(q => ({
-  id:      q.id,
-  label:   q.label,
-  section: q.section,
-  type:    q.type,
-  ...(q.options ? { options: q.options } : {}),
-}));
+// Purchaser Details is prepended as a structured entry — rendered specially in ClientDetail
+const QUESTION_SNAPSHOT = [
+  { id: 'purchaser_details', label: 'Purchaser Details', section: 'Purchaser Details', type: 'structured_v1' },
+  ...QUESTIONS.map(q => ({
+    id:      q.id,
+    label:   q.label,
+    section: q.section,
+    type:    q.type,
+    ...(q.options ? { options: q.options } : {}),
+  })),
+];
+
+// ── Purchaser details validation helpers ──────────────────────────────────────
+
+const VALID_ENTITY_TYPES = new Set(['individual', 'joint_tenants', 'tenants_in_common', 'smsf']);
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^0[2-9]\d{8}$/;
+
+function normPhone(v: unknown): string {
+  let s = (String(v ?? '')).replace(/\s+/g, '');
+  if (s.startsWith('+61')) s = '0' + s.slice(3);
+  else if (s.startsWith('61') && s.length === 11) s = '0' + s.slice(2);
+  return s;
+}
+
+function validateClientPD(c: Record<string, unknown>, includeOwnershipPct = false): string[] {
+  const errs: string[] = [];
+  if (!String(c.firstName ?? '').trim())  errs.push('firstName required');
+  if (!String(c.lastName  ?? '').trim())  errs.push('lastName required');
+  if (!String(c.address   ?? '').trim())  errs.push('address required');
+  const email = String(c.email ?? '').trim();
+  if (!email)                             errs.push('email required');
+  else if (!EMAIL_RE.test(email))         errs.push('email invalid');
+  if (!PHONE_RE.test(normPhone(c.phone))) errs.push('phone invalid');
+  if (includeOwnershipPct) {
+    const n = Number(c.ownershipPct);
+    if (!Number.isFinite(n) || n < 0 || n > 100) errs.push('ownershipPct invalid');
+  }
+  return errs;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -185,6 +189,7 @@ Deno.serve(async (req) => {
 
   const rawToken = body.token as string | undefined;
   const responses = body.responses as Record<string, unknown> | undefined;
+  const purchaserDetails = body.purchaser_details as Record<string, unknown> | undefined;
 
   if (!rawToken?.trim()) {
     return json({ error: "INVALID_REQUEST", message: "token is required" }, 400);
@@ -196,6 +201,45 @@ Deno.serve(async (req) => {
   // ── Server-side validation (trust boundary) ─────────────────────────────────
   // Performed BEFORE token claim so a validation failure does not consume the token.
   const validationErrors: string[] = [];
+
+  // ── Validate purchaser_details ──────────────────────────────────────────────
+  if (!purchaserDetails || !VALID_ENTITY_TYPES.has(purchaserDetails.entityType as string)) {
+    return json({ error: "VALIDATION_ERROR", message: "purchaser_details missing or invalid entityType" }, 400);
+  }
+
+  const et = purchaserDetails.entityType as string;
+
+  if (et === 'individual') {
+    const c = (purchaserDetails.individual ?? {}) as Record<string, unknown>;
+    const errs = validateClientPD(c);
+    for (const e of errs) validationErrors.push(`individual.${e}`);
+
+  } else if (et === 'joint_tenants' || et === 'tenants_in_common') {
+    const clients = purchaserDetails.clients;
+    if (!Array.isArray(clients) || clients.length !== 2) {
+      return json({ error: "VALIDATION_ERROR", message: `purchaser_details.clients must be an array of 2 for ${et}` }, 400);
+    }
+    const includePct = et === 'tenants_in_common';
+    for (let i = 0; i < 2; i++) {
+      const errs = validateClientPD(clients[i] as Record<string, unknown>, includePct);
+      for (const e of errs) validationErrors.push(`clients[${i}].${e}`);
+    }
+    if (includePct) {
+      const sum = Number(
+        (Number((clients[0] as Record<string, unknown>).ownershipPct ?? 0) +
+         Number((clients[1] as Record<string, unknown>).ownershipPct ?? 0)).toFixed(2)
+      );
+      if (sum !== 100) {
+        validationErrors.push(`tenants_in_common ownershipPct must sum to 100 (got ${sum})`);
+      }
+    }
+
+  } else if (et === 'smsf') {
+    const smsf = (purchaserDetails.smsf ?? {}) as Record<string, unknown>;
+    if (!String(smsf.entityName ?? '').trim()) {
+      validationErrors.push('smsf.entityName required');
+    }
+  }
 
   // a) Reject unknown keys
   for (const key of Object.keys(responses)) {
@@ -267,6 +311,12 @@ Deno.serve(async (req) => {
     return json({ error: "SERVER_ERROR", message: "Failed to process token" }, 500);
   }
 
+  // ── Safe merge: strip any purchaser_details key smuggled inside responses ──────
+  // purchaser_details is stored as a top-level key, not inside responses.
+  // This prevents key collision if a malicious client sends it in both places.
+  const { purchaser_details: _ignored, ...safeResponses } = responses as Record<string, unknown>;
+  const allResponses = { purchaser_details: purchaserDetails, ...safeResponses };
+
   // ── Insert submission ───────────────────────────────────────────────────────
   const { data: submission, error: insertError } = await adminClient
     .from("onboarding_submissions")
@@ -274,7 +324,7 @@ Deno.serve(async (req) => {
       client_id:             claimedClientId,
       token_id:              claimedTokenId,
       questionnaire_version: QUESTIONNAIRE_VERSION,
-      responses,
+      responses:             allResponses,
       question_snapshot:     QUESTION_SNAPSHOT,
       monday_sync_status:    "pending",
     })
@@ -326,7 +376,8 @@ Deno.serve(async (req) => {
       phone:                 clientRow?.phone      ?? "",
       submitted_at:          new Date().toISOString(),
       questionnaire_version: QUESTIONNAIRE_VERSION,
-      responses,
+      purchaser_details:     purchaserDetails,
+      responses:             safeResponses,
     };
 
     try {
