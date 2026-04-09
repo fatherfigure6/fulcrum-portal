@@ -842,7 +842,12 @@ export default function App() {
           } />
           <Route path="pdr-reports" element={
             session?.role === "staff"
-              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} onDelete={deleteRequest} onRefresh={refreshRequests} />
+              ? <AdminPDRRequests requests={pdrReqs} onUpdate={updateRequest} onDelete={deleteRequest} onRefresh={refreshRequests} initialSelectedId={location.state?.autoSelectId} />
+              : <Navigate to="/dashboard" replace />
+          } />
+          <Route path="pdr-reports/new" element={
+            session?.role === "staff"
+              ? <StaffNewPdrPage supabase={supabase} session={session} pdrReqs={pdrReqs} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="referrals" element={
@@ -2402,6 +2407,114 @@ export function PDRPublicForm() {
   );
 }
 
+// ── Source label helper ───────────────────────────────────────────────────────
+function getRequestSourceLabel(source) {
+  if (source === 'public') return 'Public Form';
+  if (source === 'staff')  return 'Staff';
+  return 'Broker Portal';
+}
+
+// ── PDR shared form fields ────────────────────────────────────────────────────
+function PDRFormFields({ form, onChange, errors }) {
+  const togglePT = pt => {
+    const next = form.propertyTypes.includes(pt)
+      ? form.propertyTypes.filter(x => x !== pt)
+      : [...form.propertyTypes, pt];
+    onChange('propertyTypes', next);
+  };
+  return (
+    <>
+      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Client Details</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
+        <div className="field">
+          <label>Client Name *</label>
+          <input value={form.clientName} onChange={e=>onChange('clientName',e.target.value)} placeholder="Jane Smith" />
+          {errors.clientName && <div style={{fontSize:12,color:"#e07070",marginTop:4}}>{errors.clientName}</div>}
+        </div>
+        <div className="field">
+          <label>Mobile</label>
+          <input value={form.clientMobile} onChange={e=>onChange('clientMobile',e.target.value)} placeholder="04xx xxx xxx" />
+        </div>
+      </div>
+      <div className="field">
+        <label>Client Email *</label>
+        <input value={form.clientEmail} onChange={e=>onChange('clientEmail',e.target.value)} placeholder="jane@example.com" type="email" />
+        {errors.clientEmail && <div style={{fontSize:12,color:"#e07070",marginTop:4}}>{errors.clientEmail}</div>}
+      </div>
+      <div className="divider" />
+      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Budget & Purpose</div>
+      <div className="range-row">
+        <div className="field">
+          <label>Min Budget</label>
+          <div style={{position:"relative"}}><span style={{position:"absolute",left:14,top:11,color:"#aaa",fontWeight:600}}>$</span><input value={form.budgetMin} onChange={e=>onChange('budgetMin',e.target.value)} placeholder="400,000" style={{paddingLeft:28}} type="number" min="0" /></div>
+        </div>
+        <div className="field">
+          <label>Max Budget *</label>
+          <div style={{position:"relative"}}><span style={{position:"absolute",left:14,top:11,color:"#aaa",fontWeight:600}}>$</span><input value={form.budgetMax} onChange={e=>onChange('budgetMax',e.target.value)} placeholder="650,000" style={{paddingLeft:28}} type="number" min="0" /></div>
+          {errors.budgetMax && <div style={{fontSize:12,color:"#e07070",marginTop:4}}>{errors.budgetMax}</div>}
+        </div>
+      </div>
+      <div className="field">
+        <label>Purchasing Purpose</label>
+        <div className="pill-group">
+          {[["owner","🏠 Owner-Occupier"],["investor","📈 Investor"]].map(([v,l])=>(
+            <div key={v} className={`pill${form.purpose===v?" sel-gold":""}`} onClick={()=>onChange('purpose',v)}>{l}</div>
+          ))}
+        </div>
+      </div>
+      {form.purpose==="investor" && (
+        <div className="field">
+          <label>Target Rental Yield</label>
+          <div style={{position:"relative"}}>
+            <input value={form.rentalYield} onChange={e=>onChange('rentalYield',e.target.value)} placeholder="5.5" type="number" min="0" max="20" step="0.1" style={{paddingRight:32}} />
+            <span style={{position:"absolute",right:14,top:11,color:"#aaa",fontWeight:600}}>%</span>
+          </div>
+        </div>
+      )}
+      <div className="divider" />
+      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Property Requirements</div>
+      <div className="field">
+        <label>Property Type * <span style={{fontWeight:400,color:"#bbb"}}>(select all that apply)</span></label>
+        <div className="pill-group">
+          {["House","Townhouse","Unit / Apartment","Villa","Land"].map(pt=>(
+            <div key={pt} className={`pill${form.propertyTypes.includes(pt)?" sel-purple":""}`} onClick={()=>togglePT(pt)}>{pt}</div>
+          ))}
+        </div>
+        {errors.propertyTypes && <div style={{fontSize:12,color:"#e07070",marginTop:4}}>{errors.propertyTypes}</div>}
+      </div>
+      <div className="range-row">
+        <div className="field">
+          <label>Bedrooms</label>
+          <div className="pill-group">
+            {["1","2","3","4","5+"].map(n=>(
+              <div key={n} className={`pill${form.bedrooms===n?" sel-gold":""}`} onClick={()=>onChange('bedrooms',n)}>{n}</div>
+            ))}
+          </div>
+        </div>
+        <div className="field">
+          <label>Bathrooms</label>
+          <div className="pill-group">
+            {["1","2","3","4+"].map(n=>(
+              <div key={n} className={`pill${form.bathrooms===n?" sel-gold":""}`} onClick={()=>onChange('bathrooms',n)}>{n}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="divider" />
+      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Location & Notes</div>
+      <div className="field">
+        <label>Preferred Suburbs *</label>
+        <textarea value={form.locations} onChange={e=>onChange('locations',e.target.value)} rows={2} placeholder="e.g. Applecross, Mount Pleasant, Cottesloe…" style={{resize:"vertical"}} />
+        {errors.locations && <div style={{fontSize:12,color:"#e07070",marginTop:4}}>{errors.locations}</div>}
+      </div>
+      <div className="field">
+        <label>Additional Notes <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+        <textarea value={form.notes} onChange={e=>onChange('notes',e.target.value)} rows={2} placeholder="Any other requirements or context…" style={{resize:"vertical"}} />
+      </div>
+    </>
+  );
+}
+
 // ── Price Discovery — Broker Submission Form (inside portal) ──────────────────
 function PDRBrokerForm({ onSubmit, onBack, session }) {
   const INITIAL = {
@@ -2419,12 +2532,7 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
   useEffect(() => { dirtyRef.current = isDirty; return () => { dirtyRef.current = false; }; }, [isDirty]);
   const handleBack = () => { if (isDirty && !window.confirm("Discard changes?")) return; onBack(); };
 
-  const set = k => e => setForm(f=>({...f,[k]:e.target.value}));
-  const togglePT = pt => setForm(f=>({
-    ...f, propertyTypes: f.propertyTypes.includes(pt)
-      ? f.propertyTypes.filter(x=>x!==pt)
-      : [...f.propertyTypes, pt]
-  }));
+  const onChange = (field, value) => setForm(f => ({...f, [field]: value}));
 
   const submit = async () => {
     if (!form.clientName||!form.clientEmail) return setErr("Client name and email are required.");
@@ -2441,84 +2549,7 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
         <button className="btn btn-secondary btn-sm" onClick={handleBack}>← Change type</button>
       </div>
       {err && <div className="alert alert-error">{err}</div>}
-
-      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Client Details</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 16px"}}>
-        <div className="field"><label>Client Name *</label><input value={form.clientName} onChange={set("clientName")} placeholder="Jane Smith" /></div>
-        <div className="field"><label>Mobile *</label><input value={form.clientMobile} onChange={set("clientMobile")} placeholder="04xx xxx xxx" /></div>
-      </div>
-      <div className="field"><label>Client Email *</label><input value={form.clientEmail} onChange={set("clientEmail")} placeholder="jane@example.com" type="email" /></div>
-
-      <div className="divider" />
-      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Budget & Purpose</div>
-      <div className="range-row">
-        <div className="field">
-          <label>Min Budget</label>
-          <div style={{position:"relative"}}><span style={{position:"absolute",left:14,top:11,color:"#aaa",fontWeight:600}}>$</span><input value={form.budgetMin} onChange={set("budgetMin")} placeholder="400,000" style={{paddingLeft:28}} type="number" min="0" /></div>
-        </div>
-        <div className="field">
-          <label>Max Budget *</label>
-          <div style={{position:"relative"}}><span style={{position:"absolute",left:14,top:11,color:"#aaa",fontWeight:600}}>$</span><input value={form.budgetMax} onChange={set("budgetMax")} placeholder="650,000" style={{paddingLeft:28}} type="number" min="0" /></div>
-        </div>
-      </div>
-      <div className="field">
-        <label>Purchasing Purpose</label>
-        <div className="pill-group">
-          {[["owner","🏠 Owner-Occupier"],["investor","📈 Investor"]].map(([v,l])=>(
-            <div key={v} className={`pill${form.purpose===v?" sel-gold":""}`} onClick={()=>setForm(f=>({...f,purpose:v}))}>{l}</div>
-          ))}
-        </div>
-      </div>
-      {form.purpose==="investor" && (
-        <div className="field">
-          <label>Target Rental Yield</label>
-          <div style={{position:"relative"}}>
-            <input value={form.rentalYield} onChange={set("rentalYield")} placeholder="5.5" type="number" min="0" max="20" step="0.1" style={{paddingRight:32}} />
-            <span style={{position:"absolute",right:14,top:11,color:"#aaa",fontWeight:600}}>%</span>
-          </div>
-        </div>
-      )}
-
-      <div className="divider" />
-      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Property Requirements</div>
-      <div className="field">
-        <label>Property Type * <span style={{fontWeight:400,color:"#bbb"}}>(select all that apply)</span></label>
-        <div className="pill-group">
-          {["House","Townhouse","Unit / Apartment","Villa","Land"].map(pt=>(
-            <div key={pt} className={`pill${form.propertyTypes.includes(pt)?" sel-purple":""}`} onClick={()=>togglePT(pt)}>{pt}</div>
-          ))}
-        </div>
-      </div>
-      <div className="range-row">
-        <div className="field">
-          <label>Bedrooms</label>
-          <div className="pill-group">
-            {["1","2","3","4","5+"].map(n=>(
-              <div key={n} className={`pill${form.bedrooms===n?" sel-gold":""}`} onClick={()=>setForm(f=>({...f,bedrooms:n}))}>{n}</div>
-            ))}
-          </div>
-        </div>
-        <div className="field">
-          <label>Bathrooms</label>
-          <div className="pill-group">
-            {["1","2","3","4+"].map(n=>(
-              <div key={n} className={`pill${form.bathrooms===n?" sel-gold":""}`} onClick={()=>setForm(f=>({...f,bathrooms:n}))}>{n}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="divider" />
-      <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Location & Notes</div>
-      <div className="field">
-        <label>Preferred Suburbs *</label>
-        <textarea value={form.locations} onChange={set("locations")} rows={2} placeholder="e.g. Applecross, Mount Pleasant, Cottesloe…" style={{resize:"vertical"}} />
-      </div>
-      <div className="field">
-        <label>Additional Notes <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
-        <textarea value={form.notes} onChange={set("notes")} rows={2} placeholder="Any other requirements or context…" style={{resize:"vertical"}} />
-      </div>
-
+      <PDRFormFields form={form} onChange={onChange} errors={{}} />
       <div className="divider" />
       <div className="row" style={{justifyContent:"space-between",alignItems:"center"}}>
         <div style={{fontSize:12,color:"#aaa"}}>Or <span className="text-link" onClick={()=>{ const link=`${window.location.origin}/pdr?id=${session?.id||""}`; navigator.clipboard?.writeText(link); alert("Client link copied!\n\n"+link); }}>copy client link ↗</span></div>
@@ -2528,8 +2559,133 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
   );
 }
 
+// ── Staff New PDR Page ────────────────────────────────────────────────────────
+function StaffNewPdrPage({ supabase, session, pdrReqs }) {
+  const navigate = useNavigate();
+  const INITIAL = {
+    clientName:"", clientEmail:"", clientMobile:"",
+    budgetMin:"", budgetMax:"",
+    propertyTypes:[], bedrooms:"", bathrooms:"",
+    locations:"", purpose:"owner", rentalYield:"", notes:"",
+  };
+  const [form,             setForm]             = useState(INITIAL);
+  const [clients,          setClients]          = useState([]);
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [errors,           setErrors]           = useState({});
+  const [submitError,      setSubmitError]      = useState('');
+  const [loading,          setLoading]          = useState(false);
+
+  useEffect(() => {
+    supabase
+      .from('clients')
+      .select('id, first_name, last_name, email, phone')
+      .in('status', ['submitted', 'active'])
+      .order('first_name')
+      .then(({ data }) => setClients(data ?? []));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onChange = (field, value) => setForm(f => ({...f, [field]: value}));
+
+  const handleClientPick = e => {
+    const id = e.target.value || null;
+    setSelectedClientId(id);
+    if (!id) return;
+    const c = clients.find(cl => cl.id === id);
+    if (c) setForm(f => ({
+      ...f,
+      clientName:   `${c.first_name} ${c.last_name}`.trim(),
+      clientEmail:  c.email || '',
+      clientMobile: c.phone || '',
+    }));
+  };
+
+  const priorCount = (() => {
+    if (!selectedClientId) return 0;
+    const c = clients.find(cl => cl.id === selectedClientId);
+    return c ? pdrReqs.filter(r => r.clientEmail === c.email).length : 0;
+  })();
+
+  const validate = () => {
+    const e = {};
+    if (!form.clientName.trim())  e.clientName  = 'Required';
+    if (!form.clientEmail.trim()) e.clientEmail = 'Required';
+    if (!form.budgetMax.trim())   e.budgetMax   = 'Required';
+    if (!form.locations.trim())   e.locations   = 'Required';
+    return e;
+  };
+
+  const handleSubmit = async () => {
+    const e = validate();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+    setLoading(true);
+    setSubmitError('');
+    const { data: newId, error } = await supabase.rpc('create_pdr_staff', {
+      p_client_name:    form.clientName.trim(),
+      p_client_email:   form.clientEmail.trim(),
+      p_client_mobile:  form.clientMobile,
+      p_budget_min:     form.budgetMin,
+      p_budget_max:     form.budgetMax,
+      p_property_types: form.propertyTypes,
+      p_bedrooms:       form.bedrooms,
+      p_bathrooms:      form.bathrooms,
+      p_locations:      form.locations.trim(),
+      p_purpose:        form.purpose,
+      p_rental_yield:   form.rentalYield,
+      p_notes:          form.notes,
+      p_client_id:      selectedClientId ?? null,
+    });
+    setLoading(false);
+    if (error) { setSubmitError(error.message); return; }
+    navigate('/pdr-reports', { state: { autoSelectId: newId } });
+  };
+
+  return (
+    <div style={{maxWidth:560,margin:"0 auto",padding:"24px 16px 48px"}}>
+      <div style={{marginBottom:20}}>
+        <button className="btn btn-secondary btn-sm" onClick={()=>navigate('/pdr-reports')}>← Back</button>
+      </div>
+      <div className="card">
+        <div style={{fontFamily:"'Inter',sans-serif",fontSize:18,fontWeight:700,color:"var(--primary)",marginBottom:20}}>
+          New Price Discovery Report
+        </div>
+
+        {/* Client picker */}
+        <div className="field" style={{marginBottom:16}}>
+          <label>Select Existing Client <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+          <select value={selectedClientId??""} onChange={handleClientPick} style={{width:"100%"}}>
+            <option value="">— Select existing client (optional) —</option>
+            {clients.map(c=>(
+              <option key={c.id} value={c.id}>{c.first_name} {c.last_name} — {c.email}</option>
+            ))}
+          </select>
+          {selectedClientId && priorCount > 0 && (
+            <div style={{fontSize:12,color:"#888",marginTop:6}}>
+              {priorCount} prior PDR request{priorCount!==1?"s":""} for this client.
+            </div>
+          )}
+        </div>
+
+        <div className="divider" />
+
+        <PDRFormFields form={form} onChange={onChange} errors={errors} />
+
+        <div className="divider" />
+
+        {submitError && <div className="alert alert-error" style={{marginBottom:12}}>{submitError}</div>}
+        <div style={{display:"flex",justifyContent:"flex-end"}}>
+          <button className="btn btn-purple" onClick={handleSubmit} disabled={loading}>
+            {loading?"Creating…":"Create PDR"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Admin PDR Requests ────────────────────────────────────────────────────────
-function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
+function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh, initialSelectedId }) {
+  const navigate = useNavigate();
   const [selected,    setSelected]    = useState(null);
   const [filter,      setFilter]      = useState("all");
   const [previewMode, setPreviewMode] = useState(false);
@@ -2542,6 +2698,15 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
       if (fresh) setSelected(fresh);
     }
   }, [requests]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-select newly created request (once, on first load)
+  const didAutoSelect = useRef(false);
+  useEffect(() => {
+    if (!didAutoSelect.current && initialSelectedId && requests.length) {
+      const match = requests.find(r => r.id === initialSelectedId);
+      if (match) { setSelected(match); didAutoSelect.current = true; }
+    }
+  }, [requests, initialSelectedId]);
 
   // ── Fulfilment fields ─────────────────────────────────────────────────────
   const [ful,        setFul]        = useState({ hero_statement: '', viability_summary: '', supporting_notes: '' });
@@ -2992,13 +3157,16 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
         <div className="page-sub">Review submitted briefs, add staff positioning, and manage strategic pathways</div>
       </div>
       <div className="card">
-        <div className="row" style={{marginBottom:20,gap:8,flexWrap:"wrap"}}>
+        <div className="row" style={{marginBottom:20,gap:8,flexWrap:"wrap",alignItems:"center"}}>
           {["all","pending","in_review","in_progress","complete","cancelled"].map(f => (
             <button key={f} className={`btn ${filter===f?"btn-purple":"btn-secondary"} btn-sm`}
               onClick={()=>setFilter(f)} style={{textTransform:"capitalize",whiteSpace:"nowrap"}}>
               {f === "all" ? "All" : f.replace("_", " ")}
             </button>
           ))}
+          <button className="btn btn-purple btn-sm" onClick={()=>navigate('/pdr-reports/new')} style={{marginLeft:"auto"}}>
+            + New PDR
+          </button>
         </div>
         <div className="req-table-wrap">
           <table className="tbl">
@@ -3103,7 +3271,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh }) {
               <Detail label="Client Name"   val={selected.clientName} />
               <Detail label="Client Email"  val={selected.clientEmail} />
               <Detail label="Mobile"        val={selected.clientMobile||"—"} />
-              <Detail label="Source"        val={selected.source==="public"?"Public Form":"Broker Portal"} />
+              <Detail label="Source"        val={getRequestSourceLabel(selected.source)} />
               {selected.brokerName && (
                 <Detail label="Submitted By" val={`${selected.brokerName}${selected.brokerCompany?` · ${selected.brokerCompany}`:""}`} />
               )}
