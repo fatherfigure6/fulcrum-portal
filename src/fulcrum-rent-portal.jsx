@@ -1427,6 +1427,7 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         method:  'POST',
         headers: {
           'Authorization': `Bearer ${authSession.access_token}`,
+          'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
           'Content-Type':  'application/json',
         },
         body: JSON.stringify({
