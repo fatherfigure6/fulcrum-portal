@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
 import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams, Outlet } from "react-router-dom";
@@ -253,6 +254,119 @@ function AddressAutocomplete({ value, onChange }) {
 const uid      = () => Math.random().toString(36).slice(2, 10);
 const fmt      = d  => new Date(d).toLocaleDateString("en-AU", { day:"2-digit", month:"short", year:"numeric" });
 const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
+
+// ── Rent letter PDF helpers ───────────────────────────────────────────────────
+function formatOrdinalDateClient(isoDate) {
+  const date = new Date(isoDate);
+  const tz = 'Australia/Perth';
+  const day = parseInt(new Intl.DateTimeFormat('en-AU', { day: 'numeric', timeZone: tz }).format(date));
+  const month = new Intl.DateTimeFormat('en-AU', { month: 'long', timeZone: tz }).format(date);
+  const year  = new Intl.DateTimeFormat('en-AU', { year: 'numeric', timeZone: tz }).format(date);
+  const suffix = (day >= 11 && day <= 13) ? 'th'
+    : day % 10 === 1 ? 'st'
+    : day % 10 === 2 ? 'nd'
+    : day % 10 === 3 ? 'rd' : 'th';
+  return `${day}${suffix} of ${month} ${year}`;
+}
+
+function wrapTextClient(text, maxWidth, fontSize, font) {
+  const words = text.split(' ');
+  const lines = [];
+  let current = '';
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word;
+    if (font.widthOfTextAtSize(test, fontSize) > maxWidth && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+async function buildRentLetterPdf({ propertyAddress, rentLow, rentHigh, signatoryName, signatoryPhone, signatoryEmail, letterDate, headerImageUrl }) {
+  const TEAL        = rgb(0/255, 128/255, 128/255);
+  const BODY_DARK   = rgb(51/255, 51/255, 51/255);
+  const FOOTER_GREY = rgb(102/255, 102/255, 102/255);
+
+  const headerResp = await fetch(headerImageUrl);
+  if (!headerResp.ok) throw new Error('Letterhead asset not found. Upload prm-letterhead-header.png to prm-assets bucket.');
+  const headerPngBytes = await headerResp.arrayBuffer();
+
+  const pdfDoc = await PDFDocument.create();
+  const page   = pdfDoc.addPage([595.28, 841.89]); // A4
+  const { width, height } = page.getSize();
+
+  const marginLeft   = 60;
+  const marginRight  = 60;
+  const contentWidth = width - marginLeft - marginRight;
+  const FOOTER_Y     = 70;
+  const MIN_Y        = FOOTER_Y + 30;
+
+  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+
+  const headerImage  = await pdfDoc.embedPng(headerPngBytes);
+  const headerHeight = 130;
+  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width, height: headerHeight });
+
+  let y = height - headerHeight - 50;
+  const lineH    = 18;
+  const bodySize = 11;
+
+  const drawLine = (text, font = regular, size = bodySize) => {
+    page.drawText(text, { x: marginLeft, y, size, font, color: BODY_DARK });
+    y -= lineH;
+  };
+
+  const drawWrapped = (text, font = regular, size = bodySize) => {
+    for (const line of wrapTextClient(text, contentWidth, size, font)) {
+      if (y < MIN_Y) throw new Error('OVERFLOW');
+      drawLine(line, font, size);
+    }
+  };
+
+  drawLine(formatOrdinalDateClient(letterDate));
+  y -= lineH;
+  drawLine('To Whom it may concern,');
+  y -= lineH;
+  drawLine(`RE: ${propertyAddress}`, bold);
+  y -= lineH;
+  drawWrapped(`We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${rentLow} - $${rentHigh} per week in the current rental market.`);
+  y -= lineH;
+  drawWrapped(`The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.`);
+  y -= lineH;
+  drawWrapped(`This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.`);
+  y -= lineH * 2;
+  drawLine('Warm regards,');
+  drawLine(signatoryName, bold);
+  drawLine('Perth Rental Management');
+  drawLine(signatoryPhone);
+  drawLine(signatoryEmail);
+
+  page.drawLine({
+    start: { x: marginLeft,          y: FOOTER_Y + 22 },
+    end:   { x: width - marginRight, y: FOOTER_Y + 22 },
+    thickness: 0.5, color: TEAL,
+  });
+  const footerLines = [
+    'Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696',
+    'PH: 08 6158 9924  W: perthrm.com.au  ADDRESS: 7/28 Robinson Avenue, Perth 6000',
+  ];
+  const footerSize = 7.5;
+  for (const [i, line] of footerLines.entries()) {
+    const tw = regular.widthOfTextAtSize(line, footerSize);
+    page.drawText(line, {
+      x: (width - tw) / 2,
+      y: FOOTER_Y + 10 - i * 10,
+      size: footerSize, font: regular, color: FOOTER_GREY,
+    });
+  }
+
+  return await pdfDoc.save(); // returns Uint8Array
+}
 
 // ── Infrastructure ────────────────────────────────────────────────────────────
 const DRAFT_VERSION = 1;
@@ -1419,18 +1533,19 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         if (cmaError) throw new Error(`CMA upload failed: ${cmaError.message}`);
       }
 
-      // Step 2 — Generate PDF via edge function
+      // Step 2 — Generate PDF client-side
       setStep('generating');
-      const { data: { session: authSession } } = await supabase.auth.getSession();
-      const edgeFnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-rent-letter`;
-      const genResp = await fetch(edgeFnUrl, {
-        method:  'POST',
-        headers: {
-          'Authorization': `Bearer ${authSession.access_token}`,
-          'apikey':        import.meta.env.VITE_SUPABASE_ANON_KEY,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
+      const { data: assetData } = supabase.storage
+        .from('prm-assets')
+        .getPublicUrl('prm-letterhead-header.png');
+
+      if (!assetData?.publicUrl) {
+        throw new Error('Letterhead asset URL could not be resolved from prm-assets bucket.');
+      }
+
+      let pdfBytes;
+      try {
+        pdfBytes = await buildRentLetterPdf({
           propertyAddress: form.propertyAddress.trim(),
           rentLow:         parseInt(form.rentLow,  10),
           rentHigh:        parseInt(form.rentHigh, 10),
@@ -1438,17 +1553,14 @@ function GenerateRentLetterModal({ request, session, onClose }) {
           signatoryPhone:  form.signatoryPhone.trim(),
           signatoryEmail:  form.signatoryEmail.trim(),
           letterDate:      form.letterDate,
-        }),
-      });
-
-      if (!genResp.ok) {
-        const body = await genResp.json().catch(() => ({}));
-        if (genResp.status === 403) throw new Error('Permission denied. You must be a staff member to generate letters.');
-        if (genResp.status === 422) throw new Error(body.error || 'Letter content exceeds single page. Shorten the property address.');
-        throw new Error(body.error || `Generation failed (${genResp.status})`);
+          headerImageUrl:  assetData.publicUrl,
+        });
+      } catch (e) {
+        if (e.message === 'OVERFLOW') {
+          throw new Error('Letter content exceeds the single-page layout. Shorten the property address or reduce content length.');
+        }
+        throw e;
       }
-
-      const pdfBytes = await genResp.arrayBuffer();
 
       // Step 3 — Upload letter PDF
       setStep('uploading-letter');
