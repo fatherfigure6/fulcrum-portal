@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, createContext, useContext, useMemo } from "react";
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import emailjs from "@emailjs/browser";
 import { createClient } from "@supabase/supabase-js";
 import { Routes, Route, Navigate, useLocation, useNavigate, useSearchParams, useParams, Outlet } from "react-router-dom";
@@ -269,104 +268,64 @@ function formatOrdinalDateClient(isoDate) {
   return `${day}${suffix} of ${month} ${year}`;
 }
 
-function wrapTextClient(text, maxWidth, fontSize, font) {
-  const words = text.split(' ');
-  const lines = [];
-  let current = '';
-  for (const word of words) {
-    const test = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(test, fontSize) > maxWidth && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = test;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
+function escapeHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-async function buildRentLetterPdf({ propertyAddress, rentLow, rentHigh, signatoryName, signatoryPhone, signatoryEmail, letterDate, headerImageUrl }) {
-  const TEAL        = rgb(0/255, 128/255, 128/255);
-  const BODY_DARK   = rgb(51/255, 51/255, 51/255);
-  const FOOTER_GREY = rgb(102/255, 102/255, 102/255);
+function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName, signatoryPhone, signatoryEmail, letterDate, headerPublicUrl }) {
+  const formattedDate = escapeHtml(formatOrdinalDateClient(letterDate));
+  const addr    = escapeHtml(propertyAddress);
+  const low     = escapeHtml(String(rentLow));
+  const high    = escapeHtml(String(rentHigh));
+  const name    = escapeHtml(signatoryName);
+  const phone   = escapeHtml(signatoryPhone);
+  const email   = escapeHtml(signatoryEmail);
+  const imgSrc  = escapeHtml(headerPublicUrl);
 
-  const headerResp = await fetch(headerImageUrl);
-  if (!headerResp.ok) throw new Error('Letterhead asset not found. Upload prm-letterhead-header.png to prm-assets bucket.');
-  const headerPngBytes = await headerResp.arrayBuffer();
-
-  const pdfDoc = await PDFDocument.create();
-  const page   = pdfDoc.addPage([595.28, 841.89]); // A4
-  const { width, height } = page.getSize();
-
-  const marginLeft   = 60;
-  const marginRight  = 60;
-  const contentWidth = width - marginLeft - marginRight;
-  const FOOTER_Y     = 70;
-  const MIN_Y        = FOOTER_Y + 30;
-
-  const regular = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const bold    = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
-  const headerImage  = await pdfDoc.embedPng(headerPngBytes);
-  const headerDims   = headerImage.scale(width / headerImage.width);
-  const headerHeight = headerDims.height;
-  page.drawImage(headerImage, { x: 0, y: height - headerHeight, width: headerDims.width, height: headerHeight });
-
-  let y = height - headerHeight - 50;
-  const lineH    = 18;
-  const bodySize = 11;
-
-  const drawLine = (text, font = regular, size = bodySize) => {
-    page.drawText(text, { x: marginLeft, y, size, font, color: BODY_DARK });
-    y -= lineH;
-  };
-
-  const drawWrapped = (text, font = regular, size = bodySize) => {
-    for (const line of wrapTextClient(text, contentWidth, size, font)) {
-      if (y < MIN_Y) throw new Error('OVERFLOW');
-      drawLine(line, font, size);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rent Appraisal Letter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.7; }
+    .page { max-width: 760px; margin: 0 auto; padding: 40px 60px; }
+    .header img { width: 100%; display: block; margin-bottom: 28px; }
+    p { margin-bottom: 14px; }
+    .teal-rule { border: none; border-top: 1px solid teal; margin: 24px 0 8px; }
+    .footer { text-align: center; font-size: 9px; color: #666; }
+    .footer p { margin-bottom: 4px; }
+    @media print {
+      .page { padding: 0; }
+      @page { margin: 20mm; }
     }
-  };
-
-  drawLine(formatOrdinalDateClient(letterDate));
-  y -= lineH;
-  drawLine('To Whom it may concern,');
-  y -= lineH;
-  drawLine(`RE: ${propertyAddress}`, bold);
-  y -= lineH;
-  drawWrapped(`We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${rentLow} - $${rentHigh} per week in the current rental market.`);
-  y -= lineH;
-  drawWrapped(`The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.`);
-  y -= lineH;
-  drawWrapped(`This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.`);
-  y -= lineH * 2;
-  drawLine('Warm regards,');
-  drawLine(signatoryName, bold);
-  drawLine('Perth Rental Management');
-  drawLine(signatoryPhone);
-  drawLine(signatoryEmail);
-
-  page.drawLine({
-    start: { x: marginLeft,          y: FOOTER_Y + 22 },
-    end:   { x: width - marginRight, y: FOOTER_Y + 22 },
-    thickness: 0.5, color: TEAL,
-  });
-  const footerLines = [
-    'Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696',
-    'PH: 08 6158 9924  W: perthrm.com.au  ADDRESS: 7/28 Robinson Avenue, Perth 6000',
-  ];
-  const footerSize = 7.5;
-  for (const [i, line] of footerLines.entries()) {
-    const tw = regular.widthOfTextAtSize(line, footerSize);
-    page.drawText(line, {
-      x: (width - tw) / 2,
-      y: FOOTER_Y + 10 - i * 10,
-      size: footerSize, font: regular, color: FOOTER_GREY,
-    });
-  }
-
-  return await pdfDoc.save(); // returns Uint8Array
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header"><img src="${imgSrc}" alt="Perth Rental Management" /></div>
+    <p>${formattedDate}</p>
+    <p>To Whom it may concern,</p>
+    <p><strong>RE: ${addr}</strong></p>
+    <p>We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${low} - $${high} per week in the current rental market.</p>
+    <p>The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.</p>
+    <p>This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.</p>
+    <p>Warm regards,<br><strong>${name}</strong><br>Perth Rental Management<br>${phone}<br>${email}</p>
+    <hr class="teal-rule" />
+    <div class="footer">
+      <p>Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696</p>
+      <p>PH: 08 6158 9924&nbsp;&nbsp;W: perthrm.com.au&nbsp;&nbsp;ADDRESS: 7/28 Robinson Avenue, Perth 6000</p>
+    </div>
+  </div>
+</body>
+</html>`;
 }
 
 // ── Infrastructure ────────────────────────────────────────────────────────────
@@ -1466,7 +1425,37 @@ function AdminDashboard({ requests, users }) {
 
 
 // ── Generate Rent Letter Modal ────────────────────────────────────────────────
-function GenerateRentLetterModal({ request, session, onClose }) {
+function CopyLinkButton({ url }) {
+  const [copied,    setCopied]    = useState(false);
+  const [showInput, setShowInput] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setShowInput(true);
+    }
+  };
+
+  return (
+    <>
+      <button className="btn btn-secondary" onClick={handleCopy}>
+        {copied ? 'Copied!' : 'Copy Link'}
+      </button>
+      {showInput && (
+        <input
+          readOnly value={url}
+          style={{width:'100%',marginTop:8,fontFamily:'monospace',fontSize:12}}
+          onClick={e => e.target.select()}
+        />
+      )}
+    </>
+  );
+}
+
+function GenerateRentLetterModal({ request, session, onClose, onGenerated }) {
   const today = new Date().toISOString().split('T')[0];
   const INITIAL_FORM = {
     propertyAddress: request.address || '',
@@ -1477,21 +1466,23 @@ function GenerateRentLetterModal({ request, session, onClose }) {
     signatoryEmail:  session.email || '',
     letterDate:      today,
   };
-  const [form,            setForm]            = useState(INITIAL_FORM);
-  const [cmaFile,         setCmaFile]         = useState(null);
-  const [step,            setStep]            = useState('idle');
-  const [errors,          setErrors]          = useState({});
-  const [errorMsg,        setErrorMsg]        = useState('');
-  const [isGenerating,    setIsGenerating]    = useState(false);
-  const [resultSignedUrl, setResultSignedUrl] = useState('');
+  const [form,             setForm]             = useState(INITIAL_FORM);
+  const [cmaFile,          setCmaFile]          = useState(null);
+  const [step,             setStep]             = useState('idle');
+  const [errors,           setErrors]           = useState({});
+  const [errorMsg,         setErrorMsg]         = useState('');
+  const [isGenerating,     setIsGenerating]     = useState(false);
+  const [resultUrl,        setResultUrl]        = useState('');
+  const [partialFailureUrl,setPartialFailureUrl] = useState('');
 
   const stepLabels = {
-    'uploading-cma':    'Uploading CMA…',
-    'generating':       'Generating letter…',
-    'uploading-letter': 'Uploading letter…',
-    'saving':           'Saving record…',
+    'uploading-cma':      'Uploading CMA…',
+    'generating':         'Generating letter…',
+    'uploading-letter':   'Uploading letter…',
+    'saving':             'Saving record…',
+    'updating-request':   'Saving download URL…',
   };
-  const isInProgress = ['uploading-cma', 'generating', 'uploading-letter', 'saving'].includes(step);
+  const isInProgress = ['uploading-cma', 'generating', 'uploading-letter', 'saving', 'updating-request'].includes(step);
 
   const onChange = (field, value) => setForm(f => ({ ...f, [field]: value }));
 
@@ -1521,7 +1512,8 @@ function GenerateRentLetterModal({ request, session, onClose }) {
     const now  = Date.now();
     const yyyy = new Date().getFullYear();
     const mm   = String(new Date().getMonth() + 1).padStart(2, '0');
-    let cmaPath = null;
+    let cmaPath    = null;
+    let letterPath = null;
 
     try {
       // Step 1 — Upload CMA (optional)
@@ -1534,36 +1526,25 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         if (cmaError) throw new Error(`CMA upload failed: ${cmaError.message}`);
       }
 
-      // Step 2 — Generate PDF client-side
+      // Step 2 — Generate HTML (sync — no download needed)
       setStep('generating');
-      const { data: assetData } = supabase.storage
+      const headerPublicUrl = supabase.storage
         .from('prm-assets')
-        .getPublicUrl('prm-letterhead-header.png');
+        .getPublicUrl('prm-letterhead-header.png').data.publicUrl;
 
-      if (!assetData?.publicUrl) {
-        throw new Error('Letterhead asset URL could not be resolved from prm-assets bucket.');
-      }
+      const htmlString  = buildRentLetterHtml({
+        propertyAddress: form.propertyAddress.trim(),
+        rentLow:         parseInt(form.rentLow,  10),
+        rentHigh:        parseInt(form.rentHigh, 10),
+        signatoryName:   form.signatoryName.trim(),
+        signatoryPhone:  form.signatoryPhone.trim(),
+        signatoryEmail:  form.signatoryEmail.trim(),
+        letterDate:      form.letterDate,
+        headerPublicUrl,
+      });
+      const letterBytes = new TextEncoder().encode(htmlString);
 
-      let pdfBytes;
-      try {
-        pdfBytes = await buildRentLetterPdf({
-          propertyAddress: form.propertyAddress.trim(),
-          rentLow:         parseInt(form.rentLow,  10),
-          rentHigh:        parseInt(form.rentHigh, 10),
-          signatoryName:   form.signatoryName.trim(),
-          signatoryPhone:  form.signatoryPhone.trim(),
-          signatoryEmail:  form.signatoryEmail.trim(),
-          letterDate:      form.letterDate,
-          headerImageUrl:  `${assetData.publicUrl}?t=${Date.now()}`,
-        });
-      } catch (e) {
-        if (e.message === 'OVERFLOW') {
-          throw new Error('Letter content exceeds the single-page layout. Shorten the property address or reduce content length.');
-        }
-        throw e;
-      }
-
-      // Step 3 — Upload letter PDF
+      // Step 3 — Upload letter HTML
       setStep('uploading-letter');
       const { count: existingCount } = await supabase
         .from('rent_letters')
@@ -1571,12 +1552,12 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         .eq('request_id', request.id);
       const versionNumber = (existingCount ?? 0) + 1;
 
-      const letterPath = `${yyyy}/${mm}/${request.id}_${now}_v${versionNumber}.pdf`;
+      letterPath = `${yyyy}/${mm}/${request.id}_${now}_v${versionNumber}.html`;
       const { error: letterError } = await supabase.storage
         .from('rent-letters')
-        .upload(letterPath, pdfBytes, { contentType: 'application/pdf' });
+        .upload(letterPath, letterBytes, { contentType: 'text/html; charset=utf-8' });
       if (letterError) {
-        console.error('ORPHAN_FILE', { bucket: 'cma-uploads', path: cmaPath, requestId: request.id, reason: 'letter upload failed' });
+        if (cmaPath) supabase.storage.from('cma-uploads').remove([cmaPath]).catch(console.error);
         throw new Error(`Letter upload failed: ${letterError.message}`);
       }
 
@@ -1595,26 +1576,37 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         cma_original_filename:  cmaFile?.name ?? null,
         cma_file_size_bytes:    cmaFile?.size ?? null,
         letter_storage_path:    letterPath,
-        letter_file_size_bytes: pdfBytes.byteLength,
+        letter_file_size_bytes: letterBytes.byteLength,
+        letter_format:          'html',
         generated_by:           session.id,
         letter_date:            form.letterDate,
       });
 
       if (insertError) {
-        await supabase.storage.from('rent-letters').remove([letterPath]).catch(() => {
-          console.error('ORPHAN_FILE', {
-            bucket: 'rent-letters', path: letterPath,
-            requestId: request.id, userId: session.id,
-            timestamp: new Date().toISOString(), reason: 'DB insert failed after PDF upload',
-          });
-        });
+        // DB insert failed — clean up the uploaded file
+        await supabase.storage.from('rent-letters').remove([letterPath]).catch(err =>
+          console.error('ORPHAN_FILE', { bucket: 'rent-letters', path: letterPath, reason: insertError.message, cleanupError: err })
+        );
         throw new Error(`Failed to save record: ${insertError.message}`);
       }
 
-      const { data: signedData } = await supabase.storage
-        .from('rent-letters')
-        .createSignedUrl(letterPath, 3600);
-      setResultSignedUrl(signedData?.signedUrl || '');
+      // Step 5 — Update requests.download_url with durable app URL
+      setStep('updating-request');
+      const durableUrl = `${window.location.origin}/api/rent-letter?id=${request.id}`;
+      const { error: updateError } = await supabase
+        .from('requests')
+        .update({ download_url: durableUrl })
+        .eq('id', request.id);
+
+      if (updateError) {
+        // Letter is safely stored — do NOT roll back. Show partial failure.
+        setPartialFailureUrl(durableUrl);
+        setStep('partial-failure');
+        return;
+      }
+
+      onGenerated?.(durableUrl);
+      setResultUrl(durableUrl);
       setStep('success');
 
     } catch (err) {
@@ -1627,7 +1619,7 @@ function GenerateRentLetterModal({ request, session, onClose }) {
 
   const resetForNewVersion = () => {
     setStep('idle'); setErrorMsg(''); setErrors({});
-    setCmaFile(null); setResultSignedUrl('');
+    setCmaFile(null); setResultUrl(''); setPartialFailureUrl('');
   };
 
   return (
@@ -1638,17 +1630,31 @@ function GenerateRentLetterModal({ request, session, onClose }) {
         {step === 'success' ? (
           <div>
             <div className="alert alert-success" style={{marginBottom:16}}>
-              Letter generated! The download link expires in 1 hour.
+              Letter generated. The shareable link has been saved to the download URL field.
+            </div>
+            <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
+              <a href={resultUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                Open Letter
+              </a>
+              <CopyLinkButton url={resultUrl} />
             </div>
             <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-              {resultSignedUrl && (
-                <a href={resultSignedUrl} download="rent-letter.pdf" className="btn btn-primary">
-                  Download Letter
-                </a>
-              )}
               <button className="btn btn-secondary" onClick={resetForNewVersion}>Generate New Version</button>
               <button className="btn btn-secondary" onClick={onClose}>Close</button>
             </div>
+          </div>
+        ) : step === 'partial-failure' ? (
+          <div>
+            <div className="alert alert-error" style={{marginBottom:12}}>
+              Letter saved successfully, but the download URL field could not be updated automatically.
+              Copy the link below and paste it into the "Download URL" field manually.
+            </div>
+            <input
+              readOnly value={partialFailureUrl}
+              style={{width:'100%',marginBottom:12,fontFamily:'monospace',fontSize:12}}
+              onClick={e => e.target.select()}
+            />
+            <button className="btn btn-secondary" onClick={onClose}>Close</button>
           </div>
         ) : (
           <>
@@ -1874,8 +1880,8 @@ function AdminRequests({ requests, onUpdate, onDelete, type, session }) {
               : <>
                   <div className="field">
                     <label>Download URL for Completed {isRent?"Letter":"Price Check"}</label>
-                    <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="https://drive.google.com/... or similar" />
-                    <div className="hint">Paste a shareable link to the completed PDF</div>
+                    <input value={uploadUrl} onChange={e=>setUploadUrl(e.target.value)} placeholder="Auto-filled after generating a letter" />
+                    <div className="hint">Shareable link to the completed letter</div>
                   </div>
                   <div className="row" style={{justifyContent:"space-between",gap:10}}>
                     <button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm("Delete this request? This cannot be undone.")){ onDelete(selected.id, selected.type); setSelected(null); } }}>Delete</button>
@@ -1898,6 +1904,7 @@ function AdminRequests({ requests, onUpdate, onDelete, type, session }) {
         <GenerateRentLetterModal
           request={selected}
           session={session}
+          onGenerated={(url) => setUploadUrl(url)}
           onClose={() => {
             setShowLetterModal(false);
             // Refresh letter count after modal closes
