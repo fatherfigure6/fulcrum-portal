@@ -66,7 +66,6 @@ export default async function handler(req, res) {
     .select('letter_storage_path, letter_format')
     .eq('request_id', id)
     .order('version_number', { ascending: false })
-    .order('created_at',     { ascending: false })
     .limit(1)
     .single();
 
