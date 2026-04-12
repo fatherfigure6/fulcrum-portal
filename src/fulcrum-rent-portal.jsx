@@ -299,8 +299,8 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
     body {
       font-family: Helvetica, Arial, sans-serif;
       color: #333;
-      font-size: 12px;
-      line-height: 1.65;
+      font-size: 11.5px;
+      line-height: 1.6;
       background: #e0e0e0;
     }
 
@@ -309,19 +309,26 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
       width: 210mm;
       min-height: 297mm;
       margin: 20px auto;
-      padding: 0 0 20mm;
       background: #fff;
       box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+      display: flex;
+      flex-direction: column;
     }
 
-    .header img { width: 100%; display: block; margin-bottom: 24px; }
+    .header img { width: 100%; display: block; }
 
-    .body { padding: 0 18mm 0 18mm; }
+    .body {
+      padding: 14mm 18mm 0 18mm;
+      flex: 1;
+    }
 
-    p { margin-bottom: 13px; }
+    p { margin-bottom: 16px; }
 
-    .teal-rule { border: none; border-top: 1px solid teal; margin: 20px 0 6px; }
+    .spacer { height: 10mm; }
 
+    .teal-rule { border: none; border-top: 1px solid teal; margin: 0 0 6px; }
+
+    .footer-wrap { padding: 0 18mm 10mm 18mm; }
     .footer { text-align: center; font-size: 7.5px; color: #666; }
     .footer p { margin-bottom: 3px; }
 
@@ -330,12 +337,10 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
       body { background: none; }
       .page {
         width: 100%;
-        min-height: 0;
+        min-height: 297mm;
         margin: 0;
-        padding: 0;
         box-shadow: none;
       }
-      .body { padding: 0 18mm; }
       @page { size: A4; margin: 0; }
     }
   </style>
@@ -350,7 +355,9 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
       <p>We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${low} - $${high} per week in the current rental market.</p>
       <p>The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.</p>
       <p>This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.</p>
-      <p>Warm regards,<br><strong>${name}</strong><br>Perth Rental Management<br>${phone}<br>${email}</p>
+      <p>Warm regards,<br><br><strong>${name}</strong><br>Perth Rental Management<br>${phone}<br>${email}</p>
+    </div>
+    <div class="footer-wrap">
       <hr class="teal-rule" />
       <div class="footer">
         <p>Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696</p>
