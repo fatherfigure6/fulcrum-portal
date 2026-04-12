@@ -307,37 +307,40 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
     /* A4 page on screen */
     .page {
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       margin: 20px auto;
       background: #fff;
       box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-      display: flex;
-      flex-direction: column;
+      position: relative;
+      overflow: hidden;
     }
 
     .header img { width: 100%; display: block; }
 
     .body {
-      padding: 14mm 18mm 0 18mm;
-      flex: 1;
+      padding: 18mm 18mm 0 18mm;
     }
 
-    p { margin-bottom: 16px; }
-
-    .spacer { height: 10mm; }
+    p { margin-bottom: 16px; color: #333; }
 
     .teal-rule { border: none; border-top: 1px solid teal; margin: 0 0 6px; }
 
-    .footer-wrap { padding: 0 18mm 10mm 18mm; }
+    .footer-wrap {
+      position: absolute;
+      bottom: 10mm;
+      left: 0;
+      right: 0;
+      padding: 0 18mm;
+    }
     .footer { text-align: center; font-size: 7.5px; color: #666; }
-    .footer p { margin-bottom: 3px; }
+    .footer p { margin-bottom: 3px; color: #666; }
 
     /* Print — remove chrome, enforce A4 */
     @media print {
       body { background: none; }
       .page {
         width: 100%;
-        min-height: 297mm;
+        height: 297mm;
         margin: 0;
         box-shadow: none;
       }
