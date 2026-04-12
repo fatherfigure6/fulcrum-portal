@@ -295,33 +295,67 @@ function buildRentLetterHtml({ propertyAddress, rentLow, rentHigh, signatoryName
   <title>Rent Appraisal Letter</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Helvetica, Arial, sans-serif; color: #333; font-size: 13px; line-height: 1.7; }
-    .page { max-width: 760px; margin: 0 auto; padding: 40px 60px; }
-    .header img { width: 100%; display: block; margin-bottom: 28px; }
-    p { margin-bottom: 14px; }
-    .teal-rule { border: none; border-top: 1px solid teal; margin: 24px 0 8px; }
-    .footer { text-align: center; font-size: 9px; color: #666; }
-    .footer p { margin-bottom: 4px; }
+
+    body {
+      font-family: Helvetica, Arial, sans-serif;
+      color: #333;
+      font-size: 12px;
+      line-height: 1.65;
+      background: #e0e0e0;
+    }
+
+    /* A4 page on screen */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      padding: 0 0 20mm;
+      background: #fff;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+    }
+
+    .header img { width: 100%; display: block; margin-bottom: 24px; }
+
+    .body { padding: 0 18mm 0 18mm; }
+
+    p { margin-bottom: 13px; }
+
+    .teal-rule { border: none; border-top: 1px solid teal; margin: 20px 0 6px; }
+
+    .footer { text-align: center; font-size: 7.5px; color: #666; }
+    .footer p { margin-bottom: 3px; }
+
+    /* Print — remove chrome, enforce A4 */
     @media print {
-      .page { padding: 0; }
-      @page { margin: 20mm; }
+      body { background: none; }
+      .page {
+        width: 100%;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .body { padding: 0 18mm; }
+      @page { size: A4; margin: 0; }
     }
   </style>
 </head>
 <body>
   <div class="page">
     <div class="header"><img src="${imgSrc}" alt="Perth Rental Management" /></div>
-    <p>${formattedDate}</p>
-    <p>To Whom it may concern,</p>
-    <p><strong>RE: ${addr}</strong></p>
-    <p>We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${low} - $${high} per week in the current rental market.</p>
-    <p>The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.</p>
-    <p>This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.</p>
-    <p>Warm regards,<br><strong>${name}</strong><br>Perth Rental Management<br>${phone}<br>${email}</p>
-    <hr class="teal-rule" />
-    <div class="footer">
-      <p>Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696</p>
-      <p>PH: 08 6158 9924&nbsp;&nbsp;W: perthrm.com.au&nbsp;&nbsp;ADDRESS: 7/28 Robinson Avenue, Perth 6000</p>
+    <div class="body">
+      <p>${formattedDate}</p>
+      <p>To Whom it may concern,</p>
+      <p><strong>RE: ${addr}</strong></p>
+      <p>We refer to the property mentioned above and advise that the property would conservatively obtain a rent return of $${low} - $${high} per week in the current rental market.</p>
+      <p>The information provided in this appraisal letter is intended to assist you in understanding the potential rental return for the property mentioned above. While we have conducted a thorough assessment based on current market conditions, please be aware that rental returns can vary and are subject to factors such as property demand, and market fluctuations.</p>
+      <p>This appraisal serves as a valuable tool for informational purposes and should not be considered as a definitive guarantee of the actual rental return. Should you require further information, please do not hesitate to call our office at 08 6158 9924.</p>
+      <p>Warm regards,<br><strong>${name}</strong><br>Perth Rental Management<br>${phone}<br>${email}</p>
+      <hr class="teal-rule" />
+      <div class="footer">
+        <p>Perth Rental Management Pty Ltd ABN 14 672 302 653 TA Perth Rental Management, Licensee Perth Rental Management Pty Ltd RA:66696</p>
+        <p>PH: 08 6158 9924&nbsp;&nbsp;W: perthrm.com.au&nbsp;&nbsp;ADDRESS: 7/28 Robinson Avenue, Perth 6000</p>
+      </div>
     </div>
   </div>
 </body>
