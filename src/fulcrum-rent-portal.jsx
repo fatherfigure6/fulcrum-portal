@@ -720,7 +720,7 @@ export default function App() {
     const { data: { session: authSession } } = await supabase.auth.getSession();
     if (!authSession?.access_token) return "Not authenticated.";
     const { data, error: invokeError } = await supabase.functions.invoke("admin-delete-user", {
-      headers: { Authorization: `Bearer ${session.access_token}` },
+      headers: { Authorization: `Bearer ${authSession.access_token}` },
       body: { userId: id },
     });
     if (invokeError || data?.error) {
@@ -1974,6 +1974,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
   const [form, setForm] = useState({ name:"", email:"", company:"", phone:"", tempPassword:"" });
   const [err,  setErr]  = useState("");
   const [done, setDone] = useState(false);
+  const [removing, setRemoving] = useState(null);
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const submitAdd = async () => {
     if (!form.name || !form.email || !form.company || !form.tempPassword) return setErr("Please fill all required fields.");
@@ -1983,6 +1984,13 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
       setDone(true); setForm({ name:"", email:"", company:"", phone:"", tempPassword:"" }); setErr("");
       setTimeout(() => { setDone(false); setShowForm(false); }, 2500);
     }
+  };
+  const doReject = async id => {
+    if (removing) return;
+    setRemoving(id);
+    const result = await onReject(id);
+    setRemoving(null);
+    if (result) alert(result);
   };
   return (
     <>
@@ -2027,7 +2035,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
                   <td style={{fontSize:13,color:"#aaa"}}>{b.phone||"—"}</td>
                   <td><div className="row" style={{gap:8}}>
                     <button className="btn btn-primary btn-sm" onClick={()=>onApprove(b.id)}>Approve</button>
-                    <button className="btn btn-danger  btn-sm" onClick={()=>onReject(b.id)}>Reject</button>
+                    <button className="btn btn-danger  btn-sm" onClick={()=>doReject(b.id)}>Reject</button>
                   </div></td>
                 </tr>
               ))}
@@ -2043,7 +2051,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
                 {b.phone && <div className="req-card-sub">{b.phone}</div>}
                 <div className="req-card-actions">
                   <button className="btn btn-primary btn-sm" onClick={()=>onApprove(b.id)}>Approve</button>
-                  <button className="btn btn-danger btn-sm" onClick={()=>onReject(b.id)}>Reject</button>
+                  <button className="btn btn-danger btn-sm" onClick={()=>doReject(b.id)}>Reject</button>
                 </div>
               </div>
             ))}
@@ -2061,7 +2069,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
                 <td><strong>{b.name}</strong></td><td>{b.company}</td>
                 <td style={{fontSize:13}}>{b.email}</td>
                 <td>{b.mustChangePassword ? <span className="badge badge-pending">Temp password</span> : <StatusBadge s="approved" />}</td>
-                <td><button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) onReject(b.id); }}>Remove</button></td>
+                <td><button className="btn btn-danger btn-sm" onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) doReject(b.id); }}>Remove</button></td>
               </tr>
             ))}
             {approved.length===0 && <tr><td colSpan={5}><div className="empty">No approved brokers yet</div></td></tr>}
@@ -2079,7 +2087,7 @@ function AdminBrokers({ users, onApprove, onReject, onAddBroker }) {
                 : <StatusBadge s="approved" />}
               <div className="req-card-actions">
                 <button className="btn btn-danger btn-sm"
-                  onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) onReject(b.id); }}>
+                  onClick={()=>{ if(window.confirm(`Remove access for ${b.name}? This cannot be undone.`)) doReject(b.id); }}>
                   Remove
                 </button>
               </div>
