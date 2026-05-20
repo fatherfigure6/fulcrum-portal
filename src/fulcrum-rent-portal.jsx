@@ -495,6 +495,7 @@ export default function App() {
   const registering    = useRef(false);
   const recovering     = useRef(false);
   const profileLoadRef = useRef({ userId: null, promise: null });
+  const loadedUserIdRef = useRef(null); // id of the profile currently held in session state
   const isInitialLoad  = useRef(true);
   const wasLoggedIn    = useRef(false); // true once a session has been successfully established
   const navigate = useNavigate();
@@ -529,6 +530,7 @@ export default function App() {
         if (!data) {
           console.warn("[loadProfile] no profile found, signing out");
           await supabase.auth.signOut();
+          loadedUserIdRef.current = null;
           setSession(null);
           setIsLoading(false);
           navigate("/login", { replace: true });
@@ -537,12 +539,14 @@ export default function App() {
         if (data.role === "broker" && data.status !== "approved") {
           console.warn("[loadProfile] broker not approved, signing out");
           await supabase.auth.signOut();
+          loadedUserIdRef.current = null;
           setSession(null);
           setIsLoading(false);
           navigate("/login", { replace: true });
           return;
         }
         const profile = normalizeProfile(data);
+        loadedUserIdRef.current = profile.id;
         setSession(profile);
         setIsLoading(false);
         if (profile.mustChangePassword) {
@@ -568,6 +572,7 @@ export default function App() {
         }
       } catch (err) {
         console.error("[loadProfile] failed:", err);
+        loadedUserIdRef.current = null;
         setSession(null);
         setIsLoading(false);
         navigate("/login", { replace: true });
@@ -586,6 +591,12 @@ export default function App() {
     try {
       console.log("[resolveAuth] session:", authSession, "recovering:", recovering.current);
       if (authSession?.user && !recovering.current) {
+        // Supabase v2 re-fires SIGNED_IN on tab focus / storage sync / refresh.
+        // Skip the DB round-trip when the profile is already loaded for this user.
+        if (loadedUserIdRef.current === authSession.user.id) {
+          setIsLoading(false);
+          return;
+        }
         await loadProfile(authSession.user.id);
       } else {
         setIsLoading(false);
@@ -621,7 +632,7 @@ export default function App() {
       if (event === "PASSWORD_RECOVERY") { recovering.current = true; navigate("/reset-password"); return; }
       if (event === "USER_UPDATED") { recovering.current = false; return; }
       if (event === "TOKEN_REFRESHED") return; // silent refresh — do not re-navigate
-      if (event === "SIGNED_OUT") { recovering.current = false; wasLoggedIn.current = false; setSession(null); setIsLoading(false); navigate("/login"); return; }
+      if (event === "SIGNED_OUT") { recovering.current = false; wasLoggedIn.current = false; loadedUserIdRef.current = null; setSession(null); setIsLoading(false); navigate("/login"); return; }
       if (registering.current) return;
       void resolveAuth(authSession);
     });
