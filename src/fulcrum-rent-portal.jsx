@@ -965,7 +965,7 @@ export default function App() {
           } />
           <Route path="pdr-reports/new" element={
             session?.role === "staff"
-              ? <StaffNewPdrPage supabase={supabase} session={session} pdrReqs={pdrReqs} />
+              ? <StaffNewPdrPage supabase={supabase} session={session} pdrReqs={pdrReqs} onRefresh={refreshRequests} />
               : <Navigate to="/dashboard" replace />
           } />
           <Route path="referrals" element={
@@ -3069,7 +3069,7 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
 }
 
 // ── Staff New PDR Page ────────────────────────────────────────────────────────
-function StaffNewPdrPage({ supabase, session, pdrReqs }) {
+function StaffNewPdrPage({ supabase, session, pdrReqs, onRefresh }) {
   const navigate = useNavigate();
   const INITIAL = {
     clientName:"", clientEmail:"", clientMobile:"",
@@ -3146,6 +3146,7 @@ function StaffNewPdrPage({ supabase, session, pdrReqs }) {
     });
     setLoading(false);
     if (error) { setSubmitError(error.message); return; }
+    if (onRefresh) await onRefresh();
     navigate('/pdr-reports', { state: { autoSelectId: newId } });
   };
 
