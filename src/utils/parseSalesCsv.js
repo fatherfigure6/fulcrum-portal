@@ -43,10 +43,15 @@ function splitCsvLine(line) {
 
 // ---------------------------------------------------------------------------
 // Normalise a header string for alias matching
-// Lowercase + strip all non-alphanumeric characters
+// Lowercase + map superscript digits to ASCII digits (so "m²" survives as "m2"
+// instead of "m") + strip all remaining non-alphanumeric characters
 // ---------------------------------------------------------------------------
 function normaliseKey(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return s
+    .toLowerCase()
+    .replace(/²/g, '2')
+    .replace(/³/g, '3')
+    .replace(/[^a-z0-9]/g, '');
 }
 
 // ---------------------------------------------------------------------------
@@ -77,12 +82,18 @@ const HEADER_ALIAS_MAP = {
   baths:         'bathrooms',
   bathrooms:     'bathrooms',
   landsize:      'landSize',
-  landsizesqm:   'landSize',
+  landsizem2:    'landSize',  // "Land Size (m²)"
+  landsizesqm:   'landSize',  // "Land Size (sqm)"
   landarea:      'landSize',
+  landaream2:    'landSize',
+  landareasqm:   'landSize',
+  landm2:        'landSize',
   land:          'landSize',
   lotsize:       'landSize',
+  lotsizem2:     'landSize',
   lotarea:       'landSize',
   blocksize:     'landSize',
+  blocksizem2:   'landSize',
   sqm:           'landSize',
   m2:            'landSize',
   area:          'landSize',
