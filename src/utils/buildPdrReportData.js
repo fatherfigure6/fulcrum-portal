@@ -21,7 +21,7 @@ function parsePrice(raw) {
   return isNaN(n) ? NaN : n;
 }
 
-function fmtLandSize(min, max) {
+function fmtSqmRange(min, max) {
   const lo = min != null && min !== '' ? Number(min) : null;
   const hi = max != null && max !== '' ? Number(max) : null;
   if (lo != null && Number.isNaN(lo)) return null;
@@ -72,33 +72,61 @@ export default function buildPdrReportData(request, salesRows = []) {
     projectedEndValue:    s.projected_end_value,
   }));
 
-  // ── Land-size filter classification ──────────────────────────────────────
-  // When a land-size constraint is active, rows without numeric landSize data
-  // are excluded from the filtered analysis entirely (never folded in silently).
-  // See plan §7: missing-land rows must not pollute matching-set stats.
-  const landMinNum = request.landMin != null && request.landMin !== '' ? Number(request.landMin) : null;
-  const landMaxNum = request.landMax != null && request.landMax !== '' ? Number(request.landMax) : null;
-  const landFilterActive = (landMinNum != null && !Number.isNaN(landMinNum))
-                        || (landMaxNum != null && !Number.isNaN(landMaxNum));
-  const landSizeDisplay = fmtLandSize(request.landMin, request.landMax);
+  // ── Size-filter classification (land + floor compose as AND) ────────────
+  // For each active filter, rows missing that filter's data are excluded from
+  // the filtered analysis entirely (never folded in silently). A row only
+  // joins salesRowsMatching when it satisfies every active filter and has
+  // data for every active filter.
+  const parseBound = v => (v != null && v !== '' ? Number(v) : null);
+  const landMinNum  = parseBound(request.landMin);
+  const landMaxNum  = parseBound(request.landMax);
+  const floorMinNum = parseBound(request.floorMin);
+  const floorMaxNum = parseBound(request.floorMax);
+  const landFilterActive  = (landMinNum  != null && !Number.isNaN(landMinNum))
+                         || (landMaxNum  != null && !Number.isNaN(landMaxNum));
+  const floorFilterActive = (floorMinNum != null && !Number.isNaN(floorMinNum))
+                         || (floorMaxNum != null && !Number.isNaN(floorMaxNum));
+  const anyFilterActive   = landFilterActive || floorFilterActive;
+  const landSizeDisplay   = fmtSqmRange(request.landMin,  request.landMax);
+  const floorSizeDisplay  = fmtSqmRange(request.floorMin, request.floorMax);
 
-  let salesRowsMatchingLand = salesRows;
-  let salesMissingLandCount = 0;
-  if (landFilterActive) {
-    salesRowsMatchingLand = [];
+  let salesRowsMatching     = salesRows;
+  let salesMissingLandCount  = 0;
+  let salesMissingFloorCount = 0;
+  if (anyFilterActive) {
+    salesRowsMatching = [];
     for (const r of salesRows) {
-      const ls = r.landSize != null && r.landSize !== '' ? Number(r.landSize) : NaN;
-      if (Number.isNaN(ls)) { salesMissingLandCount++; continue; }
-      if (landMinNum != null && ls < landMinNum) continue;
-      if (landMaxNum != null && ls > landMaxNum) continue;
-      salesRowsMatchingLand.push(r);
+      // Land check
+      if (landFilterActive) {
+        const ls = r.landSize != null && r.landSize !== '' ? Number(r.landSize) : NaN;
+        if (Number.isNaN(ls)) { salesMissingLandCount++; }
+      }
+      // Floor check
+      if (floorFilterActive) {
+        const fs = r.floorSize != null && r.floorSize !== '' ? Number(r.floorSize) : NaN;
+        if (Number.isNaN(fs)) { salesMissingFloorCount++; }
+      }
+      // Apply filters — fail if any active filter rejects the row
+      if (landFilterActive) {
+        const ls = r.landSize != null && r.landSize !== '' ? Number(r.landSize) : NaN;
+        if (Number.isNaN(ls)) continue;
+        if (landMinNum != null && ls < landMinNum) continue;
+        if (landMaxNum != null && ls > landMaxNum) continue;
+      }
+      if (floorFilterActive) {
+        const fs = r.floorSize != null && r.floorSize !== '' ? Number(r.floorSize) : NaN;
+        if (Number.isNaN(fs)) continue;
+        if (floorMinNum != null && fs < floorMinNum) continue;
+        if (floorMaxNum != null && fs > floorMaxNum) continue;
+      }
+      salesRowsMatching.push(r);
     }
   }
-  const salesTotalCount        = salesRows.length;
-  const salesMatchingLandCount = landFilterActive ? salesRowsMatchingLand.length : salesTotalCount;
+  const salesTotalCount    = salesRows.length;
+  const salesMatchingCount = anyFilterActive ? salesRowsMatching.length : salesTotalCount;
 
-  // ── Computed market stats (derived from land-filtered sales) ─────────────
-  const numericPrices = salesRowsMatchingLand
+  // ── Computed market stats (derived from filter-matched sales) ────────────
+  const numericPrices = salesRowsMatching
     .map(r => parsePrice(r.salePrice))
     .filter(n => !isNaN(n) && n > 0)
     .sort((a, b) => a - b);
@@ -149,7 +177,7 @@ export default function buildPdrReportData(request, salesRows = []) {
   // Best-fit: highest-priced sale at or below budgetMax, after filtering invalid prices
   let bestFitProperty = null;
   if (budgetNum != null) {
-    const affordable = salesRowsMatchingLand
+    const affordable = salesRowsMatching
       .filter(r => {
         const p = parsePrice(r.salePrice);
         return !isNaN(p) && p > 0 && p <= budgetNum;
@@ -198,6 +226,7 @@ export default function buildPdrReportData(request, salesRows = []) {
     purpose:       purposeDisplay,
     rentalYield:   rentalYieldDisplay,
     landSizeDisplay,
+    floorSizeDisplay,
 
     // ── Staff positioning (from request_pdr_details) ───────────────────────
     heroStatement:    request.heroStatement,
@@ -215,11 +244,14 @@ export default function buildPdrReportData(request, salesRows = []) {
     salesRowCount: salesRows.length,
     salesNote: null,
 
-    // ── Land-size filter disclosure (only meaningful when active) ─────────
+    // ── Size-filter disclosure (only meaningful when active) ──────────────
     landFilterActive,
+    floorFilterActive,
+    anyFilterActive,
     salesTotalCount,
-    salesMatchingLandCount,
+    salesMatchingCount,
     salesMissingLandCount,
+    salesMissingFloorCount,
 
     // ── Final statement ───────────────────────────────────────────────────
     finalStatement: null,

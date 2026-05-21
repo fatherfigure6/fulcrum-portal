@@ -97,6 +97,19 @@ const HEADER_ALIAS_MAP = {
   sqm:           'landSize',
   m2:            'landSize',
   area:          'landSize',
+  floorsize:     'floorSize',
+  floorsizem2:   'floorSize',  // "Floor Size (m²)"
+  floorsizesqm:  'floorSize',
+  floorarea:     'floorSize',
+  flooraream2:   'floorSize',
+  floorareasqm:  'floorSize',
+  buildingsize:  'floorSize',
+  buildingarea:  'floorSize',
+  internalsize:  'floorSize',
+  internalarea:  'floorSize',
+  livingarea:    'floorSize',
+  housesize:     'floorSize',
+  housearea:     'floorSize',
 };
 
 // ---------------------------------------------------------------------------
@@ -187,6 +200,7 @@ export default function parseSalesCsv(csvText) {
   if (!('bedrooms' in colMap))  warnings.push('Bedrooms column not found');
   if (!('bathrooms' in colMap)) warnings.push('Bathrooms column not found');
   if (!('landSize'  in colMap)) warnings.push('Land size column not found');
+  if (!('floorSize' in colMap)) warnings.push('Floor size column not found');
 
   // Helper: get field value by canonical key (or '' if column absent)
   function getField(rowFields, key) {
@@ -237,15 +251,18 @@ export default function parseSalesCsv(csvText) {
     const bedroomsRaw  = 'bedrooms'  in colMap ? getField(fields, 'bedrooms')  : '';
     const bathroomsRaw = 'bathrooms' in colMap ? getField(fields, 'bathrooms') : '';
     const landSizeRaw  = 'landSize'  in colMap ? getField(fields, 'landSize')  : '';
+    const floorSizeRaw = 'floorSize' in colMap ? getField(fields, 'floorSize') : '';
     const bedrooms     = bedroomsRaw  ? parseInt(bedroomsRaw,  10) || null : null;
     const bathrooms    = bathroomsRaw ? parseInt(bathroomsRaw, 10) || null : null;
-    // Land size: strip non-numeric chars (handles "650 m²", "650m2", "650 sqm")
-    let landSize = null;
-    if (landSizeRaw) {
-      const cleaned = landSizeRaw.replace(/[^0-9.]/g, '');
+    // Land + floor size: strip non-numeric chars (handles "650 m²", "650m2", "650 sqm")
+    const parseSqm = (raw) => {
+      if (!raw) return null;
+      const cleaned = raw.replace(/[^0-9.]/g, '');
       const n = cleaned ? parseFloat(cleaned) : NaN;
-      landSize = Number.isFinite(n) && n > 0 ? n : null;
-    }
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const landSize  = parseSqm(landSizeRaw);
+    const floorSize = parseSqm(floorSizeRaw);
 
     // Ancillary address parts (for downstream use)
     const suburb   = getField(fields, 'suburb');
@@ -261,6 +278,7 @@ export default function parseSalesCsv(csvText) {
       bedrooms,
       bathrooms,
       landSize,
+      floorSize,
       suburb,
       state,
       postcode,

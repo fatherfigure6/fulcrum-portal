@@ -43,10 +43,14 @@ export default function PdrReportPreview({ report }) {
     purpose,
     rentalYield,
     landSizeDisplay,
+    floorSizeDisplay,
     landFilterActive,
+    floorFilterActive,
+    anyFilterActive,
     salesTotalCount,
-    salesMatchingLandCount,
+    salesMatchingCount,
     salesMissingLandCount,
+    salesMissingFloorCount,
 
     heroStatement,
     viabilitySummary,
@@ -697,6 +701,10 @@ export default function PdrReportPreview({ report }) {
                   <span className="pdr-brief-label">Land Size</span>
                   <span className="pdr-brief-value">{valOrDash(landSizeDisplay)}</span>
                 </div>
+                <div>
+                  <span className="pdr-brief-label">Floor Size</span>
+                  <span className="pdr-brief-value">{valOrDash(floorSizeDisplay)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -870,14 +878,28 @@ export default function PdrReportPreview({ report }) {
             </table>
           </div>
 
-          {landFilterActive && (
-            <p className="pdr-note">
-              {`Land filter applied: ${salesMatchingLandCount} of ${salesTotalCount} sales matched.`}
-              {salesMissingLandCount > 0
-                ? ` ${salesMissingLandCount} row${salesMissingLandCount === 1 ? '' : 's'} had no land-size data and ${salesMissingLandCount === 1 ? 'was' : 'were'} excluded from the filtered analysis.`
-                : ''}
-            </p>
-          )}
+          {anyFilterActive && (() => {
+            const filterLabel = landFilterActive && floorFilterActive
+              ? 'Land + floor size filters applied'
+              : landFilterActive
+                ? 'Land size filter applied'
+                : 'Floor size filter applied';
+            const missingClauses = [];
+            if (landFilterActive && salesMissingLandCount > 0) {
+              missingClauses.push(`${salesMissingLandCount} row${salesMissingLandCount === 1 ? '' : 's'} had no land-size data`);
+            }
+            if (floorFilterActive && salesMissingFloorCount > 0) {
+              missingClauses.push(`${salesMissingFloorCount} row${salesMissingFloorCount === 1 ? '' : 's'} had no floor-size data`);
+            }
+            return (
+              <p className="pdr-note">
+                {`${filterLabel}: ${salesMatchingCount} of ${salesTotalCount} sales matched.`}
+                {missingClauses.length > 0
+                  ? ` ${missingClauses.join(' and ')} — excluded from the filtered analysis.`
+                  : ''}
+              </p>
+            );
+          })()}
 
           {salesNote && <p className="pdr-note">{salesNote}</p>}
         </section>
