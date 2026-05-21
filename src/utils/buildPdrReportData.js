@@ -21,6 +21,17 @@ function parsePrice(raw) {
   return isNaN(n) ? NaN : n;
 }
 
+function fmtLandSize(min, max) {
+  const lo = min != null && min !== '' ? Number(min) : null;
+  const hi = max != null && max !== '' ? Number(max) : null;
+  if (lo != null && Number.isNaN(lo)) return null;
+  if (hi != null && Number.isNaN(hi)) return null;
+  if (lo != null && hi != null) return `${lo}m² – ${hi}m²`;
+  if (lo != null) return `≥ ${lo}m²`;
+  if (hi != null) return `≤ ${hi}m²`;
+  return null;
+}
+
 export default function buildPdrReportData(request, salesRows = []) {
   // request.type is the alias set in normaliseRequest: type = row.request_type
   if (!request || request.type !== 'pdr') return null;
@@ -61,8 +72,33 @@ export default function buildPdrReportData(request, salesRows = []) {
     projectedEndValue:    s.projected_end_value,
   }));
 
-  // ── Computed market stats (derived from salesRows) ────────────────────────
-  const numericPrices = salesRows
+  // ── Land-size filter classification ──────────────────────────────────────
+  // When a land-size constraint is active, rows without numeric landSize data
+  // are excluded from the filtered analysis entirely (never folded in silently).
+  // See plan §7: missing-land rows must not pollute matching-set stats.
+  const landMinNum = request.landMin != null && request.landMin !== '' ? Number(request.landMin) : null;
+  const landMaxNum = request.landMax != null && request.landMax !== '' ? Number(request.landMax) : null;
+  const landFilterActive = (landMinNum != null && !Number.isNaN(landMinNum))
+                        || (landMaxNum != null && !Number.isNaN(landMaxNum));
+  const landSizeDisplay = fmtLandSize(request.landMin, request.landMax);
+
+  let salesRowsMatchingLand = salesRows;
+  let salesMissingLandCount = 0;
+  if (landFilterActive) {
+    salesRowsMatchingLand = [];
+    for (const r of salesRows) {
+      const ls = r.landSize != null && r.landSize !== '' ? Number(r.landSize) : NaN;
+      if (Number.isNaN(ls)) { salesMissingLandCount++; continue; }
+      if (landMinNum != null && ls < landMinNum) continue;
+      if (landMaxNum != null && ls > landMaxNum) continue;
+      salesRowsMatchingLand.push(r);
+    }
+  }
+  const salesTotalCount        = salesRows.length;
+  const salesMatchingLandCount = landFilterActive ? salesRowsMatchingLand.length : salesTotalCount;
+
+  // ── Computed market stats (derived from land-filtered sales) ─────────────
+  const numericPrices = salesRowsMatchingLand
     .map(r => parsePrice(r.salePrice))
     .filter(n => !isNaN(n) && n > 0)
     .sort((a, b) => a - b);
@@ -113,7 +149,7 @@ export default function buildPdrReportData(request, salesRows = []) {
   // Best-fit: highest-priced sale at or below budgetMax, after filtering invalid prices
   let bestFitProperty = null;
   if (budgetNum != null) {
-    const affordable = salesRows
+    const affordable = salesRowsMatchingLand
       .filter(r => {
         const p = parsePrice(r.salePrice);
         return !isNaN(p) && p > 0 && p <= budgetNum;
@@ -161,6 +197,7 @@ export default function buildPdrReportData(request, salesRows = []) {
     bathrooms:     request.bathrooms,
     purpose:       purposeDisplay,
     rentalYield:   rentalYieldDisplay,
+    landSizeDisplay,
 
     // ── Staff positioning (from request_pdr_details) ───────────────────────
     heroStatement:    request.heroStatement,
@@ -177,6 +214,12 @@ export default function buildPdrReportData(request, salesRows = []) {
     salesRows,
     salesRowCount: salesRows.length,
     salesNote: null,
+
+    // ── Land-size filter disclosure (only meaningful when active) ─────────
+    landFilterActive,
+    salesTotalCount,
+    salesMatchingLandCount,
+    salesMissingLandCount,
 
     // ── Final statement ───────────────────────────────────────────────────
     finalStatement: null,

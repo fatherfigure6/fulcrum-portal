@@ -76,6 +76,16 @@ const HEADER_ALIAS_MAP = {
   bath:          'bathrooms',
   baths:         'bathrooms',
   bathrooms:     'bathrooms',
+  landsize:      'landSize',
+  landsizesqm:   'landSize',
+  landarea:      'landSize',
+  land:          'landSize',
+  lotsize:       'landSize',
+  lotarea:       'landSize',
+  blocksize:     'landSize',
+  sqm:           'landSize',
+  m2:            'landSize',
+  area:          'landSize',
 };
 
 // ---------------------------------------------------------------------------
@@ -165,6 +175,7 @@ export default function parseSalesCsv(csvText) {
   const warnings = [];
   if (!('bedrooms' in colMap))  warnings.push('Bedrooms column not found');
   if (!('bathrooms' in colMap)) warnings.push('Bathrooms column not found');
+  if (!('landSize'  in colMap)) warnings.push('Land size column not found');
 
   // Helper: get field value by canonical key (or '' if column absent)
   function getField(rowFields, key) {
@@ -214,8 +225,16 @@ export default function parseSalesCsv(csvText) {
     // Optional numeric fields
     const bedroomsRaw  = 'bedrooms'  in colMap ? getField(fields, 'bedrooms')  : '';
     const bathroomsRaw = 'bathrooms' in colMap ? getField(fields, 'bathrooms') : '';
+    const landSizeRaw  = 'landSize'  in colMap ? getField(fields, 'landSize')  : '';
     const bedrooms     = bedroomsRaw  ? parseInt(bedroomsRaw,  10) || null : null;
     const bathrooms    = bathroomsRaw ? parseInt(bathroomsRaw, 10) || null : null;
+    // Land size: strip non-numeric chars (handles "650 m²", "650m2", "650 sqm")
+    let landSize = null;
+    if (landSizeRaw) {
+      const cleaned = landSizeRaw.replace(/[^0-9.]/g, '');
+      const n = cleaned ? parseFloat(cleaned) : NaN;
+      landSize = Number.isFinite(n) && n > 0 ? n : null;
+    }
 
     // Ancillary address parts (for downstream use)
     const suburb   = getField(fields, 'suburb');
@@ -230,6 +249,7 @@ export default function parseSalesCsv(csvText) {
       saleDateIso,
       bedrooms,
       bathrooms,
+      landSize,
       suburb,
       state,
       postcode,

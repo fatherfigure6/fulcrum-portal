@@ -42,6 +42,11 @@ export default function PdrReportPreview({ report }) {
     bathrooms,
     purpose,
     rentalYield,
+    landSizeDisplay,
+    landFilterActive,
+    salesTotalCount,
+    salesMatchingLandCount,
+    salesMissingLandCount,
 
     heroStatement,
     viabilitySummary,
@@ -688,6 +693,10 @@ export default function PdrReportPreview({ report }) {
                   <span className="pdr-brief-label">Rental Yield</span>
                   <span className="pdr-brief-value">{valOrDash(rentalYield)}</span>
                 </div>
+                <div>
+                  <span className="pdr-brief-label">Land Size</span>
+                  <span className="pdr-brief-value">{valOrDash(landSizeDisplay)}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -860,6 +869,15 @@ export default function PdrReportPreview({ report }) {
               </tbody>
             </table>
           </div>
+
+          {landFilterActive && (
+            <p className="pdr-note">
+              {`Land filter applied: ${salesMatchingLandCount} of ${salesTotalCount} sales matched.`}
+              {salesMissingLandCount > 0
+                ? ` ${salesMissingLandCount} row${salesMissingLandCount === 1 ? '' : 's'} had no land-size data and ${salesMissingLandCount === 1 ? 'was' : 'were'} excluded from the filtered analysis.`
+                : ''}
+            </p>
+          )}
 
           {salesNote && <p className="pdr-note">{salesNote}</p>}
         </section>

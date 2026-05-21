@@ -482,6 +482,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     bathrooms             = '',
     purpose               = '',
     rentalYield           = '',
+    landSizeDisplay       = '',
     heroStatement         = '',
     viabilitySummary      = '',
     salesRows             = [],
@@ -489,6 +490,12 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
     finalStatement        = '',
     strategies            = [],
     pathways              = [],
+
+    // Land-size filter disclosure
+    landFilterActive       = false,
+    salesTotalCount        = 0,
+    salesMatchingLandCount = 0,
+    salesMissingLandCount  = 0,
 
     // Computed market stats
     budgetMax             = null,
@@ -515,7 +522,10 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
 
 
   // ── Intro strip sentence ──────────────────────────────────────────────────
-  const salesCount = salesRows.length;
+  // When a land-size filter is active, intro reflects the matched subset — the
+  // same set that powers median/affordable/best-fit. The disclosure line below
+  // the sales table explains how the figure relates to the full CSV.
+  const salesCount = landFilterActive ? salesMatchingLandCount : salesRows.length;
   const introSentence = (salesCount > 0 && locations)
     ? `Based on ${salesCount} comparable sale${salesCount !== 1 ? 's' : ''} across ${esc(locations)}, here is where your budget of ${esc(budgetDisplay || '—')} sits in the current market.`
     : `This report presents current market evidence to help position your property search in context of recent comparable sales.`;
@@ -751,7 +761,8 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Bedrooms</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(bedrooms)}</span></div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Bathrooms</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(bathrooms)}</span></div>
         <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Purpose</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(purpose)}</span></div>
-        <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
+        <div style="margin-bottom:12px;"><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Rental Yield</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(rentalYield)}</span></div>
+        <div><span style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#9ca3af;font-weight:700;margin-bottom:3px;">Land Size</span><span style="font-size:15px;font-weight:700;color:#1e3a5f;display:block;">${v(landSizeDisplay)}</span></div>
       </div>
       <div class="brief-col-right">
         <div style="font-size:14px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Position Summary</div>
@@ -821,6 +832,7 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
           <tbody>${salesTableBody}</tbody>
         </table>
       </div>
+      ${landFilterActive ? `<p class="note" style="margin-top:14px;font-size:13px;color:#6b7280;">${esc(`Land filter applied: ${salesMatchingLandCount} of ${salesTotalCount} sales matched.${salesMissingLandCount > 0 ? ` ${salesMissingLandCount} row${salesMissingLandCount === 1 ? '' : 's'} had no land-size data and ${salesMissingLandCount === 1 ? 'was' : 'were'} excluded from the filtered analysis.` : ''}`)}</p>` : ''}
       ${salesNote ? `<p class="note" style="margin-top:14px;font-size:13px;color:#6b7280;">${v(salesNote)}</p>` : ''}
     </section>
 

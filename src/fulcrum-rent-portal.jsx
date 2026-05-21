@@ -81,6 +81,8 @@ function normaliseRequest(row) {
     locations:     pdr.locations,
     purpose:       pdr.purpose,
     rentalYield:   pdr.rental_yield,
+    landMin:       pdr.land_min,
+    landMax:       pdr.land_max,
     notes:         pdr.notes ?? rent.notes ?? cma.notes,
     // PDR fulfilment
     heroStatement:    pdr.hero_statement,
@@ -253,6 +255,14 @@ function AddressAutocomplete({ value, onChange }) {
 const uid      = () => Math.random().toString(36).slice(2, 10);
 const fmt      = d  => new Date(d).toLocaleDateString("en-AU", { day:"2-digit", month:"short", year:"numeric" });
 const fmtMoney = v  => v ? `$${Number(v).toLocaleString()}` : "—";
+const fmtLandSize = (min, max) => {
+  const lo = min != null && min !== "" ? Number(min) : null;
+  const hi = max != null && max !== "" ? Number(max) : null;
+  if (lo != null && hi != null) return `${lo}m² – ${hi}m²`;
+  if (lo != null) return `≥ ${lo}m²`;
+  if (hi != null) return `≤ ${hi}m²`;
+  return null;
+};
 
 // ── Rent letter PDF helpers ───────────────────────────────────────────────────
 function formatOrdinalDateClient(isoDate) {
@@ -863,6 +873,8 @@ export default function App() {
         p_locations:      data.locations || "",
         p_purpose:        data.purpose || "",
         p_rental_yield:   String(data.rentalYield ?? ""),
+        p_land_min:       String(data.landMin ?? ""),
+        p_land_max:       String(data.landMax ?? ""),
         p_notes:          data.notes || "",
       });
     }
@@ -2710,7 +2722,7 @@ export function PDRPublicForm() {
     clientName:"", clientEmail:"", clientMobile:"",
     budgetMin:"", budgetMax:"",
     propertyTypes:[], bedrooms:"", bathrooms:"",
-    locations:"", purpose:"owner", rentalYield:"", notes:""
+    locations:"", purpose:"owner", rentalYield:"", landMin:"", landMax:"", notes:""
   };
   const [form, setForm, clearDraft] = useDraft(`draft:pdr-public:${brokerId}`, PDR_INITIAL);
   const [err, setErr] = useState("");
@@ -2752,6 +2764,8 @@ export function PDRPublicForm() {
         p_locations:      form.locations || "",
         p_purpose:        form.purpose || "",
         p_rental_yield:   String(form.rentalYield ?? ""),
+        p_land_min:       String(form.landMin ?? ""),
+        p_land_max:       String(form.landMax ?? ""),
         p_notes:          form.notes || "",
       });
       if (error) throw error;
@@ -3020,6 +3034,22 @@ function PDRFormFields({ form, onChange, errors }) {
           </div>
         </div>
       </div>
+      <div className="range-row">
+        <div className="field">
+          <label>Min Land Size <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+          <div style={{position:"relative"}}>
+            <input value={form.landMin} onChange={e=>onChange('landMin',e.target.value)} placeholder="400" style={{paddingRight:36}} type="number" min="0" />
+            <span style={{position:"absolute",right:14,top:11,color:"#aaa",fontWeight:600}}>m²</span>
+          </div>
+        </div>
+        <div className="field">
+          <label>Max Land Size <span style={{fontWeight:400,color:"#bbb"}}>(optional)</span></label>
+          <div style={{position:"relative"}}>
+            <input value={form.landMax} onChange={e=>onChange('landMax',e.target.value)} placeholder="800" style={{paddingRight:36}} type="number" min="0" />
+            <span style={{position:"absolute",right:14,top:11,color:"#aaa",fontWeight:600}}>m²</span>
+          </div>
+        </div>
+      </div>
       <div className="divider" />
       <div style={{fontWeight:600,fontSize:13,color:"var(--primary)",marginBottom:10,letterSpacing:.2}}>Location & Notes</div>
       <div className="field">
@@ -3041,7 +3071,7 @@ function PDRBrokerForm({ onSubmit, onBack, session }) {
     clientName:"", clientEmail:"", clientMobile:"",
     budgetMin:"", budgetMax:"",
     propertyTypes:[], bedrooms:"", bathrooms:"",
-    locations:"", purpose:"owner", rentalYield:"", notes:""
+    locations:"", purpose:"owner", rentalYield:"", landMin:"", landMax:"", notes:""
   };
   const [form, setForm, clearDraft] = useDraft('draft:new-request:pdr', INITIAL);
   const [err, setErr] = useState("");
@@ -3086,7 +3116,7 @@ function StaffNewPdrPage({ supabase, session, pdrReqs, onRefresh }) {
     clientName:"", clientEmail:"", clientMobile:"",
     budgetMin:"", budgetMax:"",
     propertyTypes:[], bedrooms:"", bathrooms:"",
-    locations:"", purpose:"owner", rentalYield:"", notes:"",
+    locations:"", purpose:"owner", rentalYield:"", landMin:"", landMax:"", notes:"",
   };
   const [form,             setForm]             = useState(INITIAL);
   const [clients,          setClients]          = useState([]);
@@ -3152,6 +3182,8 @@ function StaffNewPdrPage({ supabase, session, pdrReqs, onRefresh }) {
       p_locations:      form.locations.trim(),
       p_purpose:        form.purpose,
       p_rental_yield:   form.rentalYield,
+      p_land_min:       form.landMin,
+      p_land_max:       form.landMax,
       p_notes:          form.notes,
       p_client_id:      selectedClientId ?? null,
     });
@@ -3804,6 +3836,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh, initialSele
               <Detail label="Property Types" val={(selected.propertyTypes||[]).join(", ")||"—"} />
               <Detail label="Bedrooms"   val={selected.bedrooms||"Any"} />
               <Detail label="Bathrooms"  val={selected.bathrooms||"Any"} />
+              <Detail label="Land Size"  val={fmtLandSize(selected.landMin, selected.landMax) || "Any"} />
               <Detail label="Preferred Suburbs" val={selected.locations||"—"} full />
               {selected.notes && <Detail label="Client Notes" val={selected.notes} full />}
             </div>
