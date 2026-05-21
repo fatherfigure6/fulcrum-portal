@@ -852,8 +852,10 @@ export default function PdrReportPreview({ report }) {
                   <th>Address</th>
                   <th>Sale Price</th>
                   <th>Sale Date</th>
-                  <th>Bedrooms</th>
-                  <th>Bathrooms</th>
+                  <th>Beds</th>
+                  <th>Baths</th>
+                  <th>Land (m²)</th>
+                  <th>Floor (m²)</th>
                 </tr>
               </thead>
               <tbody>
@@ -865,11 +867,13 @@ export default function PdrReportPreview({ report }) {
                       <td>{valOrDash(row.saleDate)}</td>
                       <td>{valOrDash(row.bedrooms)}</td>
                       <td>{valOrDash(row.bathrooms)}</td>
+                      <td>{valOrDash(row.landSize)}</td>
+                      <td>{valOrDash(row.floorSize)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} style={{ color: "#aaa", fontStyle: "italic" }}>
+                    <td colSpan={7} style={{ color: "#aaa", fontStyle: "italic" }}>
                       No sales data available yet.
                     </td>
                   </tr>

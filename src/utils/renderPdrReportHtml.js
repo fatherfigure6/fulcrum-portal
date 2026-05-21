@@ -714,10 +714,12 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
           <td style="${TD}">${v(row.address)}</td>
           <td style="${TD}">${v(row.salePrice)}</td>
           <td style="${TD}">${v(row.saleDate)}</td>
-          <td style="${TD}">${row.bedrooms != null ? esc(String(row.bedrooms)) : '—'}</td>
+          <td style="${TD}">${row.bedrooms  != null ? esc(String(row.bedrooms))  : '—'}</td>
           <td style="${TD}">${row.bathrooms != null ? esc(String(row.bathrooms)) : '—'}</td>
+          <td style="${TD}">${row.landSize  != null ? esc(String(row.landSize))  : '—'}</td>
+          <td style="${TD}">${row.floorSize != null ? esc(String(row.floorSize)) : '—'}</td>
         </tr>`).join('')
-    : `<tr><td colspan="5" style="${TD}color:#aaa;font-style:italic;">No sales data available yet.</td></tr>`;
+    : `<tr><td colspan="7" style="${TD}color:#aaa;font-style:italic;">No sales data available yet.</td></tr>`;
 
   // ── Strategic Pathways ────────────────────────────────────────────────────
   const pathwaysHtml = hasPathways ? `
@@ -852,8 +854,10 @@ export default function renderPdrReportHtml(report, { logoUrl } = {}) {
               <th style="${TH}">Address</th>
               <th style="${TH}">Sale Price</th>
               <th style="${TH}">Sale Date</th>
-              <th style="${TH}">Bedrooms</th>
-              <th style="${TH}">Bathrooms</th>
+              <th style="${TH}">Beds</th>
+              <th style="${TH}">Baths</th>
+              <th style="${TH}">Land (m²)</th>
+              <th style="${TH}">Floor (m²)</th>
             </tr>
           </thead>
           <tbody>${salesTableBody}</tbody>
