@@ -70,10 +70,16 @@ const HEADER_ALIAS_MAP = {
   saleprice:     'salePrice',
   price:         'salePrice',
   soldprice:     'salePrice',
+  lastsaleprice: 'salePrice',
+  latestsaleprice: 'salePrice',
+  purchaseprice: 'salePrice',
+  soldfor:       'salePrice',
   saledate:      'saleDate',
   date:          'saleDate',
   solddate:      'saleDate',
   contractdate:  'saleDate',
+  lastsaledate:  'saleDate',
+  latestsaledate: 'saleDate',
   bed:           'bedrooms',
   beds:          'bedrooms',
   bedrooms:      'bedrooms',
@@ -157,8 +163,32 @@ export default function parseSalesCsv(csvText) {
 
   if (lines.length < 2) throw new Error('No valid sales rows found');
 
+  // Header-row auto-detect.
+  // Some XLSX exports prepend a banner / "Report generated …" / search-criteria
+  // line above the real header. Pick the line (in the first 5) with the most
+  // recognised canonical headers, ties broken in favour of the earlier line.
+  // Falls back to line 0 if nothing scores ≥ 2, so the downstream "Missing
+  // required column" error still fires with sensible content for a truly
+  // unstructured file.
+  const HEADER_SCAN_DEPTH = Math.min(5, lines.length);
+  let headerLineIndex = 0;
+  let bestScore = -1;
+  for (let i = 0; i < HEADER_SCAN_DEPTH; i++) {
+    const cells = splitCsvLine(lines[i]);
+    let score = 0;
+    for (const cell of cells) {
+      const norm = normaliseKey(cell);
+      if (norm && HEADER_ALIAS_MAP[norm]) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      headerLineIndex = i;
+    }
+  }
+  if (bestScore < 2) headerLineIndex = 0;
+
   // Parse header row
-  const rawHeaders = splitCsvLine(lines[0]);
+  const rawHeaders = splitCsvLine(lines[headerLineIndex]);
 
   // Build column-index → canonical-key map
   // 'address' takes priority over 'street' if both appear
@@ -189,10 +219,18 @@ export default function parseSalesCsv(csvText) {
   // hasAddressCol is set above only when canonical === 'address' matched
 
   // Validate required columns
-  if (!('salePrice' in colMap)) throw new Error('Missing required column: Sale Price');
-  if (!('saleDate' in colMap))  throw new Error('Missing required column: Sale Date');
+  // Include the detected headers in error messages so a user (or developer)
+  // can immediately see what the parser saw — without this, "Missing Sale Price"
+  // is uninformative when the spreadsheet visibly has a Sale Price column.
+  const headersForError = rawHeaders.map(h => h?.trim()).filter(Boolean).join(' | ') || '(none)';
+  if (!('salePrice' in colMap)) {
+    throw new Error(`Missing required column: Sale Price. Detected headers: ${headersForError}`);
+  }
+  if (!('saleDate' in colMap)) {
+    throw new Error(`Missing required column: Sale Date. Detected headers: ${headersForError}`);
+  }
   if (!hasAddressCol && !('street' in colMap)) {
-    throw new Error('Missing required address column: provide Address or Street Address');
+    throw new Error(`Missing required address column: provide Address or Street Address. Detected headers: ${headersForError}`);
   }
 
   // Collect non-fatal warnings for missing optional columns
@@ -212,7 +250,7 @@ export default function parseSalesCsv(csvText) {
   // Parse data rows
   const rows = [];
 
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerLineIndex + 1; i < lines.length; i++) {
     const fields = splitCsvLine(lines[i]);
 
     // Build address

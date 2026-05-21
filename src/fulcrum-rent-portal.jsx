@@ -3429,6 +3429,7 @@ function AdminPDRRequests({ requests, onUpdate, onDelete, onRefresh, initialSele
         }
 
         text = XLSX.utils.sheet_to_csv(ws);
+        console.log('[handleCsvUpload] First CSV line from XLSX:', text.split('\n')[0]?.slice(0, 500));
         parsed = parseSalesCsv(text);
 
         // Index-based match — direct and reliable regardless of address format
